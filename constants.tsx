@@ -14,8 +14,14 @@ export const LEVELS: LevelConfig[] = [
       { id: 'w1', type: 'wall', x: 2, y: 0 },
       { id: 'w2', type: 'wall', x: 2, y: 4 },
     ],
-    maxBlocks: 5,
+    optimalBlocks: 4,
     availableBlocks: [BlockType.Move, BlockType.MoveBack],
+    solution: [
+      { type: BlockType.Move },
+      { type: BlockType.Move },
+      { type: BlockType.Move },
+      { type: BlockType.Move },
+    ]
   },
   {
     id: 2,
@@ -30,8 +36,15 @@ export const LEVELS: LevelConfig[] = [
       { id: 'w2', type: 'wall', x: 2, y: 2 },
       { id: 'w3', type: 'wall', x: 3, y: 2 },
     ],
-    maxBlocks: 8,
+    optimalBlocks: 5,
     availableBlocks: [BlockType.Move, BlockType.TurnRight, BlockType.TurnLeft, BlockType.MoveBack],
+    solution: [
+      { type: BlockType.Move },
+      { type: BlockType.Move },
+      { type: BlockType.TurnRight },
+      { type: BlockType.Move },
+      { type: BlockType.Move },
+    ]
   },
   {
     id: 3,
@@ -48,8 +61,21 @@ export const LEVELS: LevelConfig[] = [
       { id: 'w2', type: 'wall', x: 5, y: 1 },
       { id: 'w3', type: 'wall', x: 5, y: 2 },
     ],
-    maxBlocks: 6,
+    optimalBlocks: 3, 
     availableBlocks: [BlockType.Move, BlockType.TurnRight, BlockType.Repeat],
+    solution: [
+      { 
+        type: BlockType.Repeat, 
+        value: 5, 
+        children: [{ type: BlockType.Move }] 
+      },
+      { type: BlockType.TurnRight },
+      { 
+        type: BlockType.Repeat, 
+        value: 5, 
+        children: [{ type: BlockType.Move }] 
+      },
+    ]
   },
 ];
 

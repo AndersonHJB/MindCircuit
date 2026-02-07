@@ -20,7 +20,8 @@ const CodeBlocks: React.FC<CodeBlocksProps> = ({
 }) => {
 
   const addBlock = (type: BlockType) => {
-    if (program.length >= level.maxBlocks || isPlaying) return;
+    // Removed maxBlocks check
+    if (isPlaying) return;
     
     const newBlock: Block = {
       id: Math.random().toString(36).substr(2, 9),
@@ -29,36 +30,10 @@ const CodeBlocks: React.FC<CodeBlocksProps> = ({
       children: type === BlockType.Repeat ? [] : undefined
     };
     
-    // For simplicity in this version, loops wrap the *next* added block? 
-    // Or we just add linear blocks.
-    // Let's keep it linear: [Move, Turn, Loop]. 
-    // If Loop is added, we open a modal or simple prompt? 
-    // For this prototype, 'Repeat' will just add a special block that effectively duplicates the LAST command.
-    // Actually, let's implement the prompt's request: "Repeat(3){Move}".
-    // To keep UI simple: A 'Repeat' block will have a "+" slot inside it.
-    
-    // Simplification: "Repeat" is a modifier block that we don't nest visually in deep ways.
-    // Let's stick to flat list but 'Repeat' has a dropdown for "Next X blocks" or just "Repeat Value".
-    
-    // **Revised Approach for Stability:**
-    // A Repeat block is just a block in the list. It repeats the *Previous* block X times? No, that's weird.
-    // It repeats the *Next* block? 
-    // Let's implement a 'Slot' system.
-    
-    // ACTUALLY: Let's do a simple list. If you add "Repeat", it adds a "Start Loop" and "End Loop" pair? 
-    // Too complex.
-    
-    // **Simple Version**: We only support repeating a single action for now, OR we have a "Repeat Container".
-    // Let's go with "Repeat Container". When you click 'Repeat', it adds a container. You can drop blocks into it.
-    // To avoid complex DND library, we will use "Selection Mode".
-    
-    // **Simplest UX**:
-    // 1. Click 'Move' -> Adds Move to main list.
-    // 2. Click 'Repeat' -> Adds Repeat block with an empty 'slot'. Click slot to fill with a basic move.
-    
+    // Logic for Repeat block default child
     if (type === BlockType.Repeat) {
-       // Repeat block defaults to containing one "Move" for demo purposes or empty
-       newBlock.children = [{ id: 'temp', type: BlockType.Move }];
+       // Repeat block defaults to containing one "Move" for demo purposes
+       newBlock.children = [{ id: Math.random().toString(36).substr(2, 9), type: BlockType.Move }];
     }
     
     setProgram([...program, newBlock]);
@@ -74,7 +49,7 @@ const CodeBlocks: React.FC<CodeBlocksProps> = ({
     setProgram(program.map(b => {
       if (b.id === id && b.type === BlockType.Repeat) {
         const newVal = (b.value || 2) + delta;
-        return { ...b, value: Math.max(2, Math.min(5, newVal)) }; // Clamp 2-5
+        return { ...b, value: Math.max(2, Math.min(10, newVal)) }; // Clamp 2-10
       }
       return b;
     }));
@@ -103,10 +78,10 @@ const CodeBlocks: React.FC<CodeBlocksProps> = ({
                 <button
                     key={type}
                     onClick={() => addBlock(type)}
-                    disabled={isPlaying || program.length >= level.maxBlocks}
+                    disabled={isPlaying}
                     className={`
                         flex flex-col items-center justify-center p-2 rounded-lg transition-all
-                        ${isPlaying || program.length >= level.maxBlocks 
+                        ${isPlaying 
                             ? 'opacity-50 cursor-not-allowed bg-slate-800' 
                             : 'bg-slate-700 hover:bg-slate-600 active:scale-95 text-cyan-400 hover:text-cyan-200 ring-1 ring-cyan-900 hover:ring-cyan-500'}
                     `}
@@ -199,9 +174,9 @@ const CodeBlocks: React.FC<CodeBlocksProps> = ({
 
       {/* Footer / Usage Stat */}
       <div className="p-2 bg-slate-900 border-t border-slate-700 flex justify-between items-center text-xs text-slate-400 font-mono">
-        <span>MEM: {program.length}/{level.maxBlocks} BLOCKS</span>
-        <span className={program.length >= level.maxBlocks ? "text-red-500" : "text-green-500"}>
-            {program.length >= level.maxBlocks ? "FULL" : "READY"}
+        <span>BLOCKS: {program.length}</span>
+        <span className={program.length <= level.optimalBlocks ? "text-green-500" : "text-yellow-500"}>
+            TARGET: {level.optimalBlocks}
         </span>
       </div>
     </div>

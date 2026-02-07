@@ -20,6 +20,13 @@ export interface Block {
   children?: Block[]; // For nested blocks (loops)
 }
 
+// Simplified block structure for defining solutions in constants
+export interface SolutionBlockDef {
+  type: BlockType;
+  value?: number;
+  children?: SolutionBlockDef[];
+}
+
 export interface Position {
   x: number;
   y: number;
@@ -38,8 +45,9 @@ export interface LevelConfig {
   startPos: Position;
   startDir: Direction;
   entities: Entity[];
-  maxBlocks: number;
+  optimalBlocks: number; // The target number of blocks for a "Perfect" score
   availableBlocks: BlockType[];
+  solution: SolutionBlockDef[]; // The correct answer
 }
 
 export interface RobotState {

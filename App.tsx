@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Play, RotateCcw, Box, HelpCircle, CheckCircle, XCircle, Terminal } from 'lucide-react';
+import { Play, RotateCcw, Box, HelpCircle, CheckCircle, XCircle, Terminal, Trash2, Eye, Award } from 'lucide-react';
 import GridMap from './components/GridMap';
 import CodeBlocks from './components/CodeBlocks';
 import { LEVELS } from './constants';
 import { compileProgram, executeStep, getInitialState } from './services/engine';
-import { Block, BlockType, RobotState } from './types';
+import { Block, BlockType, RobotState, SolutionBlockDef } from './types';
 
 const App: React.FC = () => {
   // Game State
@@ -55,6 +55,33 @@ const App: React.FC = () => {
     setIsPlaying(false);
     setRobotState(getInitialState(currentLevel));
     setCurrentStepIndex(-1);
+    // Note: We intentionally do NOT clear setProgram here, users keep their blocks
+  };
+
+  const handleClear = () => {
+      if (isPlaying) return;
+      if (confirm("Clear all blocks?")) {
+          setProgram([]);
+          handleStop();
+      }
+  };
+
+  const loadSolution = () => {
+      // Recursively helper to convert solution defs to blocks with IDs
+      const convertDef = (defs: SolutionBlockDef[]): Block[] => {
+          return defs.map(def => ({
+              id: Math.random().toString(36).substr(2, 9),
+              type: def.type,
+              value: def.value,
+              children: def.children ? convertDef(def.children) : undefined
+          }));
+      };
+
+      const solutionBlocks = convertDef(currentLevel.solution);
+      setProgram(solutionBlocks);
+      setShowWinModal(false);
+      handleStop(); // Reset position
+      // Optional: Auto run? Let's just load it so they can see it.
   };
 
   // Game Loop
@@ -92,6 +119,8 @@ const App: React.FC = () => {
 
     return () => clearTimeout(timer);
   }, [isPlaying, currentStepIndex, executionQueue, currentLevel, playbackSpeed]);
+
+  const isOptimal = program.length <= currentLevel.optimalBlocks;
 
   return (
     <div className="flex flex-col h-screen w-full bg-slate-950 text-white font-sans overflow-hidden">
@@ -143,16 +172,25 @@ const App: React.FC = () => {
                  <button 
                     onClick={handleStop}
                     className="px-4 py-3 bg-slate-700 hover:bg-slate-600 rounded-lg text-slate-300 transition-colors flex items-center justify-center"
-                    title="Reset Simulation"
+                    title="Reset Simulation (Keep Code)"
                  >
                      <RotateCcw size={18} />
+                 </button>
+
+                 <button 
+                    onClick={handleClear}
+                    disabled={isPlaying}
+                    className="px-4 py-3 bg-slate-700 hover:bg-slate-600 hover:text-red-400 rounded-lg text-slate-300 transition-colors flex items-center justify-center"
+                    title="Clear All Blocks"
+                 >
+                     <Trash2 size={18} />
                  </button>
             </div>
 
             <div className="flex-1 min-h-0 flex flex-col">
                <div className="mb-2 flex justify-between items-center px-1">
                   <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">Program Sequence</span>
-                  <span className="text-[10px] text-slate-500 font-mono">DRAG & DROP READY</span>
+                  <span className="text-[10px] text-slate-500 font-mono">UNLIMITED BLOCKS</span>
                </div>
                <CodeBlocks 
                  program={program} 
@@ -167,6 +205,17 @@ const App: React.FC = () => {
         {/* Right Panel: Simulation */}
         <section className="flex-1 relative bg-slate-950 flex flex-col items-center justify-center p-6">
             
+            {/* Top Error Banner (Non-blocking) */}
+            <div className="absolute top-4 w-full px-6 z-30 pointer-events-none">
+                 {robotState.crashed && (
+                     <div className="mx-auto max-w-md bg-red-900/80 backdrop-blur border border-red-500 text-red-100 px-4 py-2 rounded-lg flex items-center justify-center gap-3 shadow-xl animate-fade-in pointer-events-auto">
+                        <XCircle size={20} className="text-red-400" />
+                        <span className="text-sm font-bold">Collision Detected! Reset to try again.</span>
+                        <button onClick={handleStop} className="ml-auto text-xs bg-red-800 hover:bg-red-700 px-2 py-1 rounded">Reset</button>
+                     </div>
+                 )}
+            </div>
+
             {/* Grid Container */}
             <div className="relative z-10 w-full max-w-lg">
                 <GridMap level={currentLevel} robotState={robotState} />
@@ -204,39 +253,60 @@ const App: React.FC = () => {
       {/* Win Modal */}
       {showWinModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-fade-in">
-           <div className="bg-slate-900 border border-green-500/30 rounded-2xl p-8 max-w-sm w-full shadow-[0_0_50px_rgba(34,197,94,0.2)] text-center relative overflow-hidden">
-              <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-green-500 to-transparent" />
+           <div className={`
+                bg-slate-900 border rounded-2xl p-8 max-w-sm w-full shadow-2xl text-center relative overflow-hidden
+                ${isOptimal ? 'border-green-500/50 shadow-[0_0_50px_rgba(34,197,94,0.3)]' : 'border-yellow-500/50 shadow-[0_0_50px_rgba(234,179,8,0.3)]'}
+           `}>
+              {/* Confetti / Light Effect */}
+              <div className={`absolute top-0 left-0 w-full h-1 bg-gradient-to-r ${isOptimal ? 'from-transparent via-green-500 to-transparent' : 'from-transparent via-yellow-500 to-transparent'}`} />
               
-              <CheckCircle size={64} className="mx-auto text-green-500 mb-4 animate-bounce" />
-              <h2 className="text-2xl font-bold text-white mb-2">MISSION ACCOMPLISHED</h2>
-              <p className="text-slate-400 mb-6 text-sm">Sequence executed successfully.</p>
+              {isOptimal ? (
+                  <CheckCircle size={64} className="mx-auto text-green-500 mb-4 animate-bounce" />
+              ) : (
+                  <Award size={64} className="mx-auto text-yellow-500 mb-4 animate-pulse" />
+              )}
               
-              <button 
-                onClick={() => {
-                   if (currentLevelId < LEVELS.length) {
-                       setCurrentLevelId(id => id + 1);
-                   } else {
-                       setCurrentLevelId(1); // Loop back
-                   }
-                   setShowWinModal(false);
-                }}
-                className="w-full py-3 bg-green-600 hover:bg-green-500 text-white font-bold rounded-xl transition-all shadow-lg active:scale-95"
-              >
-                  {currentLevelId < LEVELS.length ? "PROCEED TO NEXT LEVEL" : "RESTART CAMPAIGN"}
-              </button>
+              <h2 className="text-2xl font-bold text-white mb-2">
+                  {isOptimal ? "PERFECT EXECUTION" : "MISSION COMPLETED"}
+              </h2>
+              
+              <p className="text-slate-400 mb-6 text-sm">
+                  {isOptimal 
+                    ? "Your code is optimized for maximum efficiency." 
+                    : `You used ${program.length} blocks. The optimal solution uses ${currentLevel.optimalBlocks}.`}
+              </p>
+              
+              <div className="flex flex-col gap-3">
+                  <button 
+                    onClick={() => {
+                       if (currentLevelId < LEVELS.length) {
+                           setCurrentLevelId(id => id + 1);
+                       } else {
+                           setCurrentLevelId(1); // Loop back
+                       }
+                       setShowWinModal(false);
+                    }}
+                    className={`w-full py-3 font-bold rounded-xl transition-all shadow-lg active:scale-95 text-white
+                        ${isOptimal ? 'bg-green-600 hover:bg-green-500' : 'bg-blue-600 hover:bg-blue-500'}
+                    `}
+                  >
+                      {currentLevelId < LEVELS.length ? "NEXT MISSION" : "RESTART CAMPAIGN"}
+                  </button>
+
+                  {!isOptimal && (
+                      <button 
+                        onClick={loadSolution}
+                        className="w-full py-3 bg-slate-800 hover:bg-slate-700 text-yellow-400 font-bold rounded-xl transition-all border border-slate-700 flex items-center justify-center gap-2"
+                      >
+                         <Eye size={18} />
+                         VIEW OPTIMAL SOLUTION
+                      </button>
+                  )}
+              </div>
            </div>
         </div>
       )}
 
-      {/* Crash Overlay - Just a subtle flash */}
-      {robotState.crashed && (
-         <div className="absolute inset-0 pointer-events-none z-50 flex items-center justify-center bg-red-900/20 backdrop-blur-[2px]">
-             <div className="bg-black/90 text-red-500 px-8 py-4 rounded-xl border border-red-500 font-mono font-bold flex items-center gap-3 shadow-2xl animate-shake">
-                 <XCircle size={24} /> 
-                 <span>CRITICAL FAILURE: COLLISION</span>
-             </div>
-         </div>
-      )}
       
       <style>{`
         @keyframes fade-in {
