@@ -4,8 +4,8 @@ import { ArrowUp, ArrowDown, CornerUpLeft, CornerUpRight, Repeat } from 'lucide-
 export const LEVELS: LevelConfig[] = [
   {
     id: 1,
-    name: "Initiation",
-    description: "Program the robot to reach the Data Terminal.",
+    name: "初试锋芒",
+    description: "编写程序让机器人到达绿色的数据终端。",
     gridSize: 5,
     startPos: { x: 0, y: 2 },
     startDir: Direction.East,
@@ -25,8 +25,8 @@ export const LEVELS: LevelConfig[] = [
   },
   {
     id: 2,
-    name: "The Corner",
-    description: "Use Turn commands to navigate around the firewall.",
+    name: "直角转弯",
+    description: "使用转向指令，绕过前方的防火墙。",
     gridSize: 5,
     startPos: { x: 1, y: 4 },
     startDir: Direction.North,
@@ -48,8 +48,8 @@ export const LEVELS: LevelConfig[] = [
   },
   {
     id: 3,
-    name: "Loop Logic",
-    description: "Use the Repeat block to traverse long distances efficiently.",
+    name: "循环逻辑",
+    description: "使用“循环”指令来高效地长距离移动。",
     gridSize: 6,
     startPos: { x: 0, y: 0 },
     startDir: Direction.East,
@@ -85,6 +85,14 @@ export const BLOCK_ICONS: Record<BlockType, any> = {
   [BlockType.TurnLeft]: CornerUpLeft,
   [BlockType.TurnRight]: CornerUpRight,
   [BlockType.Repeat]: Repeat,
+};
+
+export const BLOCK_NAMES: Record<BlockType, string> = {
+  [BlockType.Move]: "前进",
+  [BlockType.MoveBack]: "后退",
+  [BlockType.TurnLeft]: "左转",
+  [BlockType.TurnRight]: "右转",
+  [BlockType.Repeat]: "循环",
 };
 
 export const BLOCK_COLORS: Record<BlockType, string> = {

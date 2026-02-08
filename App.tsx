@@ -60,7 +60,7 @@ const App: React.FC = () => {
 
   const handleClear = () => {
       if (isPlaying) return;
-      if (confirm("Clear all blocks?")) {
+      if (confirm("确定要清空所有指令吗？")) {
           setProgram([]);
           handleStop();
       }
@@ -133,10 +133,10 @@ const App: React.FC = () => {
           </div>
           <div>
              <h1 className="text-xl font-bold tracking-wider text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-cyan-300">
-               BOT COMMANDER
+               机器指挥官
              </h1>
              <div className="text-[10px] text-slate-400 tracking-widest uppercase">
-               Mission {currentLevel.id}: {currentLevel.name}
+               第 {currentLevel.id} 关: {currentLevel.name}
              </div>
           </div>
         </div>
@@ -166,13 +166,13 @@ const App: React.FC = () => {
                     `}
                  >
                      <Play size={18} fill="currentColor" />
-                     EXECUTE
+                     执行
                  </button>
 
                  <button 
                     onClick={handleStop}
                     className="px-4 py-3 bg-slate-700 hover:bg-slate-600 rounded-lg text-slate-300 transition-colors flex items-center justify-center"
-                    title="Reset Simulation (Keep Code)"
+                    title="重置模拟 (保留代码)"
                  >
                      <RotateCcw size={18} />
                  </button>
@@ -181,7 +181,7 @@ const App: React.FC = () => {
                     onClick={handleClear}
                     disabled={isPlaying}
                     className="px-4 py-3 bg-slate-700 hover:bg-slate-600 hover:text-red-400 rounded-lg text-slate-300 transition-colors flex items-center justify-center"
-                    title="Clear All Blocks"
+                    title="清空所有指令"
                  >
                      <Trash2 size={18} />
                  </button>
@@ -189,8 +189,8 @@ const App: React.FC = () => {
 
             <div className="flex-1 min-h-0 flex flex-col">
                <div className="mb-2 flex justify-between items-center px-1">
-                  <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">Program Sequence</span>
-                  <span className="text-[10px] text-slate-500 font-mono">UNLIMITED BLOCKS</span>
+                  <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">程序指令序列</span>
+                  <span className="text-[10px] text-slate-500 font-mono">无限制模式</span>
                </div>
                <CodeBlocks 
                  program={program} 
@@ -210,8 +210,8 @@ const App: React.FC = () => {
                  {robotState.crashed && (
                      <div className="mx-auto max-w-md bg-red-900/80 backdrop-blur border border-red-500 text-red-100 px-4 py-2 rounded-lg flex items-center justify-center gap-3 shadow-xl animate-fade-in pointer-events-auto">
                         <XCircle size={20} className="text-red-400" />
-                        <span className="text-sm font-bold">Collision Detected! Reset to try again.</span>
-                        <button onClick={handleStop} className="ml-auto text-xs bg-red-800 hover:bg-red-700 px-2 py-1 rounded">Reset</button>
+                        <span className="text-sm font-bold">发生碰撞！请重置后重试。</span>
+                        <button onClick={handleStop} className="ml-auto text-xs bg-red-800 hover:bg-red-700 px-2 py-1 rounded">重置</button>
                      </div>
                  )}
             </div>
@@ -225,14 +225,14 @@ const App: React.FC = () => {
             <div className="mt-8 w-full max-w-lg h-36 bg-slate-900/90 rounded-lg border border-slate-700 p-3 font-mono text-xs overflow-hidden flex flex-col shadow-xl">
                 <div className="flex items-center gap-2 text-slate-400 border-b border-slate-700 pb-2 mb-2">
                    <Terminal size={14} />
-                   <span>SYSTEM_LOG</span>
+                   <span>系统日志</span>
                 </div>
                 <div className="overflow-y-auto custom-scrollbar flex-1 space-y-1">
-                    {robotState.logs.length === 0 && <span className="text-slate-600 italic">Ready for input...</span>}
+                    {robotState.logs.length === 0 && <span className="text-slate-600 italic">准备就绪...</span>}
                     {robotState.logs.map((log, i) => (
                         <div key={i} className="animate-fade-in">
                             <span className="text-slate-500 mr-2">{`>`}</span>
-                            <span className={log.includes('CRITICAL') ? 'text-red-400' : log.includes('COMPLETE') ? 'text-green-400' : 'text-cyan-100'}>
+                            <span className={log.includes('错误') ? 'text-red-400' : log.includes('达成') ? 'text-green-400' : 'text-cyan-100'}>
                               {log}
                             </span>
                         </div>
@@ -267,13 +267,13 @@ const App: React.FC = () => {
               )}
               
               <h2 className="text-2xl font-bold text-white mb-2">
-                  {isOptimal ? "PERFECT EXECUTION" : "MISSION COMPLETED"}
+                  {isOptimal ? "完美运行" : "任务完成"}
               </h2>
               
               <p className="text-slate-400 mb-6 text-sm">
                   {isOptimal 
-                    ? "Your code is optimized for maximum efficiency." 
-                    : `You used ${program.length} blocks. The optimal solution uses ${currentLevel.optimalBlocks}.`}
+                    ? "你的代码非常高效，达到了最佳步数。" 
+                    : `你使用了 ${program.length} 个指令。最佳方案只需 ${currentLevel.optimalBlocks} 个。`}
               </p>
               
               <div className="flex flex-col gap-3">
@@ -290,7 +290,7 @@ const App: React.FC = () => {
                         ${isOptimal ? 'bg-green-600 hover:bg-green-500' : 'bg-blue-600 hover:bg-blue-500'}
                     `}
                   >
-                      {currentLevelId < LEVELS.length ? "NEXT MISSION" : "RESTART CAMPAIGN"}
+                      {currentLevelId < LEVELS.length ? "下一关" : "重新开始"}
                   </button>
 
                   {!isOptimal && (
@@ -299,7 +299,7 @@ const App: React.FC = () => {
                         className="w-full py-3 bg-slate-800 hover:bg-slate-700 text-yellow-400 font-bold rounded-xl transition-all border border-slate-700 flex items-center justify-center gap-2"
                       >
                          <Eye size={18} />
-                         VIEW OPTIMAL SOLUTION
+                         查看最佳方案
                       </button>
                   )}
               </div>

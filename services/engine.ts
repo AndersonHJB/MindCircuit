@@ -56,10 +56,10 @@ export const executeStep = (
 
   if (command.type === BlockType.TurnLeft) {
     nextState.dir = (nextState.dir + 3) % 4;
-    nextState.logs.push("Turned Left");
+    nextState.logs.push("向左转弯");
   } else if (command.type === BlockType.TurnRight) {
     nextState.dir = (nextState.dir + 1) % 4;
-    nextState.logs.push("Turned Right");
+    nextState.logs.push("向右转弯");
   } else if (command.type === BlockType.Move || command.type === BlockType.MoveBack) {
     const isBack = command.type === BlockType.MoveBack;
     const { nx, ny } = getNextPos(nextState.x, nextState.y, nextState.dir, isBack);
@@ -71,11 +71,11 @@ export const executeStep = (
 
     if (wall || outOfBounds) {
       nextState.crashed = true;
-      nextState.logs.push("CRITICAL FAILURE: Collision detected.");
+      nextState.logs.push("严重错误：检测到碰撞。");
     } else {
       nextState.x = nx;
       nextState.y = ny;
-      nextState.logs.push(`${isBack ? 'Reversed' : 'Moved'} to (${nx}, ${ny})`);
+      nextState.logs.push(`${isBack ? '后退' : '移动'} 至坐标 (${nx}, ${ny})`);
     }
   }
 
@@ -83,13 +83,13 @@ export const executeStep = (
   const coin = entities.find(e => e.type === 'coin' && e.x === nextState.x && e.y === nextState.y);
   if (coin && !nextState.collectedCoins.includes(coin.id)) {
     nextState.collectedCoins.push(coin.id);
-    nextState.logs.push("Coin Collected!");
+    nextState.logs.push("获得金币！");
   }
 
   const end = entities.find(e => e.type === 'end' && e.x === nextState.x && e.y === nextState.y);
   if (end) {
     nextState.won = true;
-    nextState.logs.push("TARGET REACHED. SEQUENCE COMPLETE.");
+    nextState.logs.push("目标达成。序列执行完毕。");
   }
 
   return nextState;
@@ -102,5 +102,5 @@ export const getInitialState = (level: LevelConfig): RobotState => ({
   crashed: false,
   won: false,
   collectedCoins: [],
-  logs: ["System Online. Awaiting command."],
+  logs: ["系统在线。等待指令输入。"],
 });

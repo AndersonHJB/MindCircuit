@@ -1,6 +1,6 @@
 import React from 'react';
 import { Block, BlockType, LevelConfig } from '../types';
-import { BLOCK_ICONS, BLOCK_COLORS } from '../constants';
+import { BLOCK_ICONS, BLOCK_COLORS, BLOCK_NAMES } from '../constants';
 import { Trash2, PlusCircle, Repeat } from 'lucide-react';
 
 interface CodeBlocksProps {
@@ -87,7 +87,7 @@ const CodeBlocks: React.FC<CodeBlocksProps> = ({
                     `}
                 >
                     <Icon size={24} />
-                    <span className="text-[10px] mt-1 font-bold">{type.replace('_', ' ')}</span>
+                    <span className="text-[12px] mt-1 font-bold">{BLOCK_NAMES[type]}</span>
                 </button>
             )
         })}
@@ -98,7 +98,7 @@ const CodeBlocks: React.FC<CodeBlocksProps> = ({
         {program.length === 0 && (
             <div className="h-full flex flex-col items-center justify-center text-slate-500 opacity-50">
                 <PlusCircle size={48} className="mb-2" />
-                <p className="text-sm">Add commands to start</p>
+                <p className="text-sm">点击上方按钮添加指令</p>
             </div>
         )}
 
@@ -122,7 +122,7 @@ const CodeBlocks: React.FC<CodeBlocksProps> = ({
               <div className="flex-1">
                 <div className="flex justify-between items-center">
                     <span className="font-bold text-sm tracking-wide text-white/90">
-                        {block.type === BlockType.Repeat ? 'LOOP SEQUENCE' : block.type.replace('_', ' ')}
+                        {block.type === BlockType.Repeat ? '循环序列' : BLOCK_NAMES[block.type]}
                     </span>
                     
                     {!isPlaying && (
@@ -139,13 +139,13 @@ const CodeBlocks: React.FC<CodeBlocksProps> = ({
                 {block.type === BlockType.Repeat && (
                     <div className="mt-2 pl-2 border-l-2 border-white/10 flex flex-col gap-2">
                         <div className="flex items-center gap-2 text-xs text-slate-300">
-                             <span>Run</span>
+                             <span>执行</span>
                              <div className="flex items-center bg-black/30 rounded px-1">
                                 <button onClick={() => updateLoopCount(block.id, -1)} className="px-2 hover:text-white">-</button>
                                 <span className="font-mono text-cyan-400 w-4 text-center">{block.value}</span>
                                 <button onClick={() => updateLoopCount(block.id, 1)} className="px-2 hover:text-white">+</button>
                              </div>
-                             <span>times:</span>
+                             <span>次：</span>
                         </div>
                         
                         {/* Nested Slot (Simplified to 1 child for prototype) */}
@@ -174,9 +174,9 @@ const CodeBlocks: React.FC<CodeBlocksProps> = ({
 
       {/* Footer / Usage Stat */}
       <div className="p-2 bg-slate-900 border-t border-slate-700 flex justify-between items-center text-xs text-slate-400 font-mono">
-        <span>BLOCKS: {program.length}</span>
+        <span>当前指令数: {program.length}</span>
         <span className={program.length <= level.optimalBlocks ? "text-green-500" : "text-yellow-500"}>
-            TARGET: {level.optimalBlocks}
+            目标: {level.optimalBlocks}
         </span>
       </div>
     </div>
