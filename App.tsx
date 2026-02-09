@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Play, RotateCcw, Box, HelpCircle, CheckCircle, XCircle, Terminal, Trash2, Eye, Award } from 'lucide-react';
+import { Play, RotateCcw, Box, HelpCircle, CheckCircle, XCircle, Terminal, Trash2, Eye, Award, Zap } from 'lucide-react';
 import GridMap from './components/GridMap';
 import CodeBlocks from './components/CodeBlocks';
 import { LEVELS } from './constants';
@@ -14,6 +14,9 @@ const App: React.FC = () => {
   const [robotState, setRobotState] = useState<RobotState>(getInitialState(LEVELS[0]));
   const [playbackSpeed, setPlaybackSpeed] = useState(500); // ms per step
   
+  // Stats
+  const [attemptCount, setAttemptCount] = useState(0);
+
   // Execution State
   const [executionQueue, setExecutionQueue] = useState<Block[]>([]); // Flattened instructions
   const [currentStepIndex, setCurrentStepIndex] = useState(-1);
@@ -34,12 +37,16 @@ const App: React.FC = () => {
     setCurrentStepIndex(-1);
     setExecutionQueue([]);
     setShowWinModal(false);
+    setAttemptCount(0); // Reset attempts on new level
   }, [currentLevel]);
 
   // Compile and Start
   const handleRun = () => {
     if (program.length === 0) return;
     
+    // Increment attempt counter
+    setAttemptCount(prev => prev + 1);
+
     // Compile nested loops into flat list
     const flatSteps = compileProgram(program);
     setExecutionQueue(flatSteps);
@@ -121,6 +128,7 @@ const App: React.FC = () => {
   }, [isPlaying, currentStepIndex, executionQueue, currentLevel, playbackSpeed]);
 
   const isOptimal = program.length <= currentLevel.optimalBlocks;
+  const isOneShot = attemptCount === 1;
 
   return (
     <div className="flex flex-col h-screen w-full bg-slate-950 text-white font-sans overflow-hidden">
@@ -198,6 +206,7 @@ const App: React.FC = () => {
                  level={currentLevel} 
                  isPlaying={isPlaying}
                  activeBlockIndex={currentStepIndex} 
+                 attemptCount={attemptCount}
                />
             </div>
         </section>
@@ -260,6 +269,14 @@ const App: React.FC = () => {
               {/* Confetti / Light Effect */}
               <div className={`absolute top-0 left-0 w-full h-1 bg-gradient-to-r ${isOptimal ? 'from-transparent via-green-500 to-transparent' : 'from-transparent via-yellow-500 to-transparent'}`} />
               
+              {/* One Shot Badge */}
+              {isOneShot && (
+                  <div className="absolute top-4 right-4 bg-yellow-500/20 text-yellow-300 border border-yellow-500/50 text-[10px] font-bold px-2 py-1 rounded-full flex items-center gap-1 animate-pulse">
+                      <Zap size={10} fill="currentColor" />
+                      一次通关
+                  </div>
+              )}
+
               {isOptimal ? (
                   <CheckCircle size={64} className="mx-auto text-green-500 mb-4 animate-bounce" />
               ) : (
@@ -270,11 +287,16 @@ const App: React.FC = () => {
                   {isOptimal ? "完美运行" : "任务完成"}
               </h2>
               
-              <p className="text-slate-400 mb-6 text-sm">
-                  {isOptimal 
-                    ? "你的代码非常高效，达到了最佳步数。" 
-                    : `你使用了 ${program.length} 个指令。最佳方案只需 ${currentLevel.optimalBlocks} 个。`}
-              </p>
+              <div className="mb-6 space-y-1 text-slate-400 text-sm">
+                  <p>
+                    {isOptimal 
+                        ? "代码效率评级：S级" 
+                        : `代码指令数：${program.length} (目标: ${currentLevel.optimalBlocks})`}
+                  </p>
+                  <p className={isOneShot ? "text-yellow-400 font-bold" : ""}>
+                      总尝试次数：{attemptCount} {isOneShot && "(完美!)"}
+                  </p>
+              </div>
               
               <div className="flex flex-col gap-3">
                   <button 

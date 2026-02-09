@@ -9,6 +9,7 @@ interface CodeBlocksProps {
   level: LevelConfig;
   isPlaying: boolean;
   activeBlockIndex: number | null; // For visualization during run
+  attemptCount: number; // New prop
 }
 
 const CodeBlocks: React.FC<CodeBlocksProps> = ({ 
@@ -16,7 +17,8 @@ const CodeBlocks: React.FC<CodeBlocksProps> = ({
   setProgram, 
   level, 
   isPlaying, 
-  activeBlockIndex 
+  activeBlockIndex,
+  attemptCount
 }) => {
 
   const addBlock = (type: BlockType) => {
@@ -174,7 +176,10 @@ const CodeBlocks: React.FC<CodeBlocksProps> = ({
 
       {/* Footer / Usage Stat */}
       <div className="p-2 bg-slate-900 border-t border-slate-700 flex justify-between items-center text-xs text-slate-400 font-mono">
-        <span>当前指令数: {program.length}</span>
+        <div className="flex gap-4">
+             <span>指令: {program.length}</span>
+             <span>尝试: {attemptCount}</span>
+        </div>
         <span className={program.length <= level.optimalBlocks ? "text-green-500" : "text-yellow-500"}>
             目标: {level.optimalBlocks}
         </span>
