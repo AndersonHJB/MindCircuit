@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Play, RotateCcw, Box, HelpCircle, CheckCircle, XCircle, Terminal, Trash2, Eye, Award, Zap, Hammer, Pencil, Eraser, Flag, Hexagon, User } from 'lucide-react';
+import { Play, RotateCcw, Box, HelpCircle, CheckCircle, XCircle, Terminal, Trash2, Eye, Award, Zap, Hammer, Pencil, Eraser, Flag, Hexagon, User, Grid3x3, Settings } from 'lucide-react';
 import GridMap from './components/GridMap';
 import CodeBlocks from './components/CodeBlocks';
 import { LEVELS } from './constants';
@@ -11,7 +11,7 @@ const DEFAULT_CUSTOM_LEVEL: LevelConfig = {
   id: 999,
   name: "自定义地图",
   description: "由玩家设计的关卡。",
-  gridSize: 6,
+  gridSize: 6, // Will be overridden on init
   startPos: { x: 0, y: 0 },
   startDir: Direction.East,
   entities: [],
@@ -55,12 +55,21 @@ const App: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentLevelId, gameMode]);
 
-  // Special reset for entering Creative Mode
+  // Special reset for entering Creative Mode & Auto-Adaptation
   useEffect(() => {
      if (gameMode === GameMode.Creative) {
-         setCustomLevel(DEFAULT_CUSTOM_LEVEL);
+         // Auto-adapt grid size based on screen width
+         const isMobile = window.innerWidth < 768;
+         const defaultSize = isMobile ? 5 : 8;
+
+         const newLevel = {
+             ...DEFAULT_CUSTOM_LEVEL,
+             gridSize: defaultSize
+         };
+         
+         setCustomLevel(newLevel);
          setIsEditingCustom(true);
-         setRobotState(getInitialState(DEFAULT_CUSTOM_LEVEL));
+         setRobotState(getInitialState(newLevel));
      }
   }, [gameMode]);
 
@@ -83,13 +92,10 @@ const App: React.FC = () => {
       
       // Prevent placing start on top of existing entity (unless erasing)
       if (editorTool === EditorTool.Start) {
-          // Remove old start-like behavior (handled by startPos state, not entity list usually)
-          // But ensure no wall is there
           if (existingEntityIndex !== -1) {
               newEntities.splice(existingEntityIndex, 1);
           }
           setCustomLevel(prev => ({ ...prev, startPos: { x, y }, entities: newEntities }));
-          // Update visual robot position immediately for feedback
           setRobotState(prev => ({ ...prev, x, y }));
           return;
       }
@@ -107,13 +113,12 @@ const App: React.FC = () => {
 
           // Do not place entities on Start Pos
           if (x === customLevel.startPos.x && y === customLevel.startPos.y) {
-              return; // Can't place block on robot
+              return; 
           }
 
           if (editorTool === EditorTool.Wall) {
               newEntities.push({ id: `w-${Date.now()}`, type: 'wall', x, y });
           } else if (editorTool === EditorTool.End) {
-              // Ensure only one end point? Usually yes.
               const oldEndIndex = newEntities.findIndex(e => e.type === 'end');
               if (oldEndIndex !== -1) newEntities.splice(oldEndIndex, 1);
               newEntities.push({ id: `e-${Date.now()}`, type: 'end', x, y });
@@ -125,21 +130,45 @@ const App: React.FC = () => {
       setCustomLevel(prev => ({ ...prev, entities: newEntities }));
   };
 
+  const handleGridResize = (e: React.ChangeEvent<HTMLInputElement>) => {
+      const newSize = parseInt(e.target.value, 10);
+      setCustomLevel(prev => {
+          // 1. Filter out entities that are now out of bounds
+          const validEntities = prev.entities.filter(ent => ent.x < newSize && ent.y < newSize);
+          
+          // 2. Check if Start Pos is out of bounds
+          let newStartPos = prev.startPos;
+          if (newStartPos.x >= newSize || newStartPos.y >= newSize) {
+              newStartPos = { x: 0, y: 0 };
+          }
+
+          const updatedLevel = {
+              ...prev,
+              gridSize: newSize,
+              entities: validEntities,
+              startPos: newStartPos
+          };
+
+          // Update visual robot immediately
+          setRobotState(getInitialState(updatedLevel));
+
+          return updatedLevel;
+      });
+  };
+
   const validateAndPlayCustomLevel = () => {
-      // Check for End Point
       const hasEnd = customLevel.entities.some(e => e.type === 'end');
       if (!hasEnd) {
           alert("请设置终点！");
           return;
       }
       setIsEditingCustom(false);
-      resetLevel(); // Reset state to start pos for playing
+      resetLevel(); 
   };
 
   const backToEdit = () => {
       setIsEditingCustom(true);
       handleStop();
-      // Reset robot state to just showing position without logs/crash
       setRobotState(getInitialState(customLevel));
   };
 
@@ -170,7 +199,6 @@ const App: React.FC = () => {
   };
 
   const loadSolution = () => {
-      // Recursively helper to convert solution defs to blocks with IDs
       const convertDef = (defs: SolutionBlockDef[]): Block[] => {
           return defs.map(def => ({
               id: Math.random().toString(36).substr(2, 9),
@@ -217,8 +245,34 @@ const App: React.FC = () => {
   // Render Helpers
   const renderEditorTools = () => (
       <div className="bg-slate-800 p-4 rounded-xl border border-slate-700 space-y-4">
-          <div className="text-sm font-bold text-slate-400 uppercase tracking-widest mb-2 border-b border-slate-700 pb-2">
-              地图编辑器
+          <div className="text-sm font-bold text-slate-400 uppercase tracking-widest mb-2 border-b border-slate-700 pb-2 flex items-center gap-2">
+              <Settings size={14} />
+              地图设置
+          </div>
+          
+          {/* Grid Size Slider */}
+          <div className="bg-slate-900/50 p-3 rounded-lg border border-slate-700/50 mb-2">
+              <div className="flex justify-between items-center mb-2">
+                  <span className="text-xs text-slate-400 flex items-center gap-1">
+                      <Grid3x3 size={12} /> 地图尺寸
+                  </span>
+                  <span className="text-xs font-mono text-cyan-400 font-bold">
+                      {customLevel.gridSize} x {customLevel.gridSize}
+                  </span>
+              </div>
+              <input 
+                  type="range" 
+                  min="3" 
+                  max="12" 
+                  step="1"
+                  value={customLevel.gridSize}
+                  onChange={handleGridResize}
+                  className="w-full h-1.5 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-cyan-500 hover:accent-cyan-400"
+              />
+          </div>
+
+          <div className="text-sm font-bold text-slate-400 uppercase tracking-widest mb-2 border-b border-slate-700 pb-2 mt-4">
+              放置工具
           </div>
           <div className="grid grid-cols-2 gap-2">
               <button 
@@ -409,7 +463,7 @@ const App: React.FC = () => {
             </div>
 
             {/* Grid Container */}
-            <div className="relative z-10 w-full max-w-lg">
+            <div className="relative z-10 w-full flex items-center justify-center h-full max-h-[70vh] md:max-h-[80vh]">
                 <GridMap 
                     level={activeLevel} 
                     robotState={robotState} 
@@ -419,7 +473,7 @@ const App: React.FC = () => {
             </div>
 
             {/* Logs / Console */}
-            <div className="mt-8 w-full max-w-lg h-36 bg-slate-900/90 rounded-lg border border-slate-700 p-3 font-mono text-xs overflow-hidden flex flex-col shadow-xl">
+            <div className="mt-4 w-full max-w-lg h-32 bg-slate-900/90 rounded-lg border border-slate-700 p-3 font-mono text-xs overflow-hidden flex flex-col shadow-xl z-20">
                 <div className="flex items-center gap-2 text-slate-400 border-b border-slate-700 pb-2 mb-2">
                    <Terminal size={14} />
                    <span>系统日志</span>

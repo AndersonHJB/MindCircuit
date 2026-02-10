@@ -92,12 +92,14 @@ const GridMap: React.FC<GridMapProps> = ({ level, robotState, isEditing = false,
 
   return (
     <div 
-      className={`grid gap-2 bg-slate-900 p-4 rounded-xl border border-slate-700 shadow-2xl relative transition-colors ${isEditing ? 'border-yellow-500/30' : ''}`}
+      className={`grid gap-2 bg-slate-900 p-4 rounded-xl border border-slate-700 shadow-2xl relative transition-all duration-300 ${isEditing ? 'border-yellow-500/30' : ''}`}
       style={{
         gridTemplateColumns: `repeat(${gridSize}, minmax(0, 1fr))`,
         aspectRatio: '1/1',
-        maxWidth: '500px',
-        width: '100%'
+        width: '100%',
+        maxWidth: '100%',
+        maxHeight: '100%', // Allow fitting in parent vertically
+        objectFit: 'contain' 
       }}
     >
       {/* Floor Grid Decoration */}
