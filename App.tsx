@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { Play, RotateCcw, Box, HelpCircle, CheckCircle, XCircle, Terminal, Trash2, Eye, Award, Zap, Hammer, Pencil, Eraser, Flag, Hexagon, User, Grid3x3, Settings } from 'lucide-react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { Play, RotateCcw, Box, HelpCircle, CheckCircle, XCircle, Terminal, Trash2, Eye, Award, Zap, Hammer, Pencil, Eraser, Flag, Hexagon, User, Grid3x3, Settings, ChevronRight } from 'lucide-react';
 import GridMap from './components/GridMap';
 import CodeBlocks from './components/CodeBlocks';
 import { LEVELS } from './constants';
@@ -43,6 +43,9 @@ const App: React.FC = () => {
   const [executionQueue, setExecutionQueue] = useState<Block[]>([]);
   const [currentStepIndex, setCurrentStepIndex] = useState(-1);
   const [showWinModal, setShowWinModal] = useState(false);
+
+  // Refs for auto-scrolling logs
+  const logsEndRef = useRef<HTMLDivElement>(null);
   
   // Derived current level based on mode
   const activeLevel = gameMode === GameMode.Story 
@@ -72,6 +75,11 @@ const App: React.FC = () => {
          setRobotState(getInitialState(newLevel));
      }
   }, [gameMode]);
+
+  // Auto-scroll logs
+  useEffect(() => {
+      logsEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [robotState.logs]);
 
   const resetLevel = useCallback(() => {
     setProgram([]);
@@ -328,7 +336,7 @@ const App: React.FC = () => {
     <div className="flex flex-col h-screen w-full bg-slate-950 text-white font-sans overflow-hidden">
       
       {/* Header */}
-      <header className="h-16 flex items-center justify-between px-6 border-b border-slate-800 bg-slate-900/80 backdrop-blur-md z-30">
+      <header className="h-16 shrink-0 flex items-center justify-between px-6 border-b border-slate-800 bg-slate-900/80 backdrop-blur-md z-30">
         <div className="flex items-center space-x-3">
           <div className={`w-10 h-10 rounded-lg flex items-center justify-center shadow-lg transition-colors ${gameMode === GameMode.Story ? 'bg-blue-600 shadow-blue-500/20' : 'bg-purple-600 shadow-purple-500/20'}`}>
             {gameMode === GameMode.Story ? <Box className="text-white" size={24} /> : <Hammer className="text-white" size={24} />}
@@ -348,7 +356,7 @@ const App: React.FC = () => {
 
         <div className="flex items-center space-x-4">
              {/* Mode Switcher */}
-             <div className="flex bg-slate-800 p-1 rounded-lg border border-slate-700">
+             <div className="flex bg-slate-800 p-1 rounded-lg border border-slate-700 hidden md:flex">
                  <button 
                     onClick={() => setGameMode(GameMode.Story)}
                     className={`px-3 py-1 text-xs font-bold rounded flex items-center gap-2 transition-all ${gameMode === GameMode.Story ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-white'}`}
@@ -363,6 +371,16 @@ const App: React.FC = () => {
                  </button>
              </div>
              
+             {/* Mobile simple switcher */}
+             <div className="md:hidden flex gap-2">
+                 <button 
+                    onClick={() => setGameMode(prev => prev === GameMode.Story ? GameMode.Creative : GameMode.Story)}
+                    className="p-2 bg-slate-800 rounded border border-slate-700"
+                 >
+                    {gameMode === GameMode.Story ? <User size={20} className="text-purple-400"/> : <Box size={20} className="text-blue-400"/>}
+                 </button>
+             </div>
+
              <button className="p-2 text-slate-400 hover:text-white transition-colors" title="Help">
                  <HelpCircle size={20} />
              </button>
@@ -370,10 +388,10 @@ const App: React.FC = () => {
       </header>
 
       {/* Main Content */}
-      <main className="flex-1 flex overflow-hidden relative">
+      <main className="flex-1 flex flex-col md:flex-row overflow-hidden relative">
         
         {/* Left Panel: Content changes based on Mode and Phase */}
-        <section className="w-full md:w-1/3 max-w-md p-4 flex flex-col space-y-4 border-r border-slate-800 bg-slate-900/50 z-20">
+        <section className="order-2 md:order-1 h-1/2 md:h-full w-full md:w-1/3 max-w-md p-4 flex flex-col space-y-4 border-t md:border-t-0 md:border-r border-slate-800 bg-slate-900/50 z-20">
             
             {/* If in Creative Edit Mode, show Editor Tools. Otherwise show Code Blocks */}
             {gameMode === GameMode.Creative && isEditingCustom ? (
@@ -381,7 +399,7 @@ const App: React.FC = () => {
             ) : (
                 <>
                     {/* Control Bar */}
-                    <div className="bg-slate-800 p-3 rounded-xl border border-slate-700 flex gap-2">
+                    <div className="bg-slate-800 p-3 rounded-xl border border-slate-700 flex gap-2 shrink-0">
                         {gameMode === GameMode.Creative && (
                              <button 
                                 onClick={backToEdit}
@@ -427,7 +445,9 @@ const App: React.FC = () => {
                     <div className="flex-1 min-h-0 flex flex-col">
                         <div className="mb-2 flex justify-between items-center px-1">
                             <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">程序指令序列</span>
-                            <span className="text-[10px] text-slate-500 font-mono">无限制模式</span>
+                            <span className="text-[10px] text-slate-500 font-mono">
+                                {gameMode === GameMode.Story ? "LIMIT: " + activeLevel.optimalBlocks : "UNLIMITED"}
+                            </span>
                         </div>
                         <CodeBlocks 
                             program={program} 
@@ -443,27 +463,27 @@ const App: React.FC = () => {
         </section>
 
         {/* Right Panel: Simulation / Grid Map */}
-        <section className="flex-1 relative bg-slate-950 flex flex-col items-center justify-center p-6">
+        <section className="order-1 md:order-2 flex-1 relative bg-slate-950 flex flex-col overflow-hidden">
             
             {/* Top Error Banner */}
-            <div className="absolute top-4 w-full px-6 z-30 pointer-events-none">
+            <div className="absolute top-4 left-0 right-0 px-6 z-30 pointer-events-none flex justify-center">
                  {robotState.crashed && (
-                     <div className="mx-auto max-w-md bg-red-900/80 backdrop-blur border border-red-500 text-red-100 px-4 py-2 rounded-lg flex items-center justify-center gap-3 shadow-xl animate-fade-in pointer-events-auto">
+                     <div className="bg-red-900/90 backdrop-blur border border-red-500 text-red-100 px-4 py-2 rounded-lg flex items-center justify-center gap-3 shadow-[0_0_20px_rgba(239,68,68,0.4)] animate-fade-in pointer-events-auto">
                         <XCircle size={20} className="text-red-400" />
-                        <span className="text-sm font-bold">发生碰撞！请重置后重试。</span>
-                        <button onClick={handleStop} className="ml-auto text-xs bg-red-800 hover:bg-red-700 px-2 py-1 rounded">重置</button>
+                        <span className="text-sm font-bold">发生碰撞！系统停止。</span>
+                        <button onClick={handleStop} className="ml-2 text-xs bg-red-800 hover:bg-red-700 px-2 py-1 rounded border border-red-700">重置</button>
                      </div>
                  )}
                  {gameMode === GameMode.Creative && isEditingCustom && (
-                     <div className="mx-auto max-w-md bg-purple-900/80 backdrop-blur border border-purple-500 text-purple-100 px-4 py-2 rounded-lg flex items-center justify-center gap-2 shadow-xl animate-fade-in">
+                     <div className="bg-purple-900/80 backdrop-blur border border-purple-500 text-purple-100 px-4 py-2 rounded-lg flex items-center justify-center gap-2 shadow-xl animate-fade-in">
                         <Pencil size={16} />
                         <span className="text-xs font-bold">编辑模式：点击网格放置元素</span>
                      </div>
                  )}
             </div>
 
-            {/* Grid Container */}
-            <div className="relative z-10 w-full flex items-center justify-center h-full max-h-[70vh] md:max-h-[80vh]">
+            {/* Grid Container - Flexible space */}
+            <div className="flex-1 min-h-0 flex items-center justify-center p-4 relative z-10">
                 <GridMap 
                     level={activeLevel} 
                     robotState={robotState} 
@@ -472,24 +492,35 @@ const App: React.FC = () => {
                 />
             </div>
 
-            {/* Logs / Console */}
-            <div className="mt-4 w-full max-w-lg h-32 bg-slate-900/90 rounded-lg border border-slate-700 p-3 font-mono text-xs overflow-hidden flex flex-col shadow-xl z-20">
-                <div className="flex items-center gap-2 text-slate-400 border-b border-slate-700 pb-2 mb-2">
-                   <Terminal size={14} />
-                   <span>系统日志</span>
-                </div>
-                <div className="overflow-y-auto custom-scrollbar flex-1 space-y-1">
-                    {robotState.logs.length === 0 && <span className="text-slate-600 italic">准备就绪...</span>}
-                    {robotState.logs.map((log, i) => (
-                        <div key={i} className="animate-fade-in">
-                            <span className="text-slate-500 mr-2">{`>`}</span>
-                            <span className={log.includes('错误') ? 'text-red-400' : log.includes('达成') ? 'text-green-400' : 'text-cyan-100'}>
-                              {log}
-                            </span>
-                        </div>
-                    ))}
-                    <div className="h-2" /> {/* Spacer */}
-                </div>
+            {/* Logs / Console - Fixed Height at bottom */}
+            <div className="shrink-0 w-full z-20 px-4 pb-4 md:px-8">
+               <div className="w-full max-w-3xl mx-auto bg-slate-900/90 rounded-xl border border-slate-700 shadow-2xl backdrop-blur-md overflow-hidden flex flex-col transition-all duration-300">
+                  {/* Terminal Header */}
+                  <div className="h-8 bg-black/40 border-b border-slate-700/50 flex items-center justify-between px-3">
+                      <div className="flex items-center gap-2">
+                           <Terminal size={14} className="text-cyan-500" />
+                           <span className="text-[10px] font-mono font-bold text-slate-400 tracking-widest">SYSTEM_LOGS // V.2.4</span>
+                      </div>
+                      <div className="flex gap-1.5">
+                           <div className={`w-2 h-2 rounded-full ${isPlaying ? 'bg-green-500 animate-pulse' : 'bg-slate-600'}`} />
+                           <div className="w-2 h-2 rounded-full bg-slate-700" />
+                      </div>
+                  </div>
+                  
+                  {/* Terminal Content */}
+                  <div className="h-28 md:h-36 overflow-y-auto p-3 font-mono text-xs custom-scrollbar bg-black/20 space-y-1">
+                      {robotState.logs.length === 0 && <span className="text-slate-600 italic opacity-50">...等待输入...</span>}
+                      {robotState.logs.map((log, i) => (
+                          <div key={i} className="animate-fade-in flex items-start">
+                              <span className="text-slate-600 mr-2 shrink-0">{`>`}</span>
+                              <span className={log.includes('错误') || log.includes('碰撞') ? 'text-red-400' : log.includes('达成') ? 'text-green-400 font-bold' : log.includes('获得') ? 'text-yellow-400' : 'text-cyan-100'}>
+                                {log}
+                              </span>
+                          </div>
+                      ))}
+                      <div ref={logsEndRef} />
+                  </div>
+               </div>
             </div>
 
             {/* Background Decoration */}
