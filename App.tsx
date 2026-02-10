@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Play, RotateCcw, Box, HelpCircle, CheckCircle, XCircle, Terminal, Trash2, Eye, Award, Zap, Hammer, Pencil, Eraser, Flag, Hexagon, User, Grid3x3, Settings, ChevronRight } from 'lucide-react';
+import { Play, RotateCcw, Box, HelpCircle, CheckCircle, XCircle, Terminal, Trash2, Eye, Award, Zap, Hammer, Pencil, Eraser, Flag, Hexagon, User, Grid3x3, Settings, ChevronRight, AlertTriangle } from 'lucide-react';
 import GridMap from './components/GridMap';
 import CodeBlocks from './components/CodeBlocks';
 import { LEVELS } from './constants';
@@ -43,6 +43,7 @@ const App: React.FC = () => {
   const [executionQueue, setExecutionQueue] = useState<Block[]>([]);
   const [currentStepIndex, setCurrentStepIndex] = useState(-1);
   const [showWinModal, setShowWinModal] = useState(false);
+  const [showClearModal, setShowClearModal] = useState(false); // Custom modal for clear confirmation
 
   // Refs for auto-scrolling logs
   const logsEndRef = useRef<HTMLDivElement>(null);
@@ -88,6 +89,7 @@ const App: React.FC = () => {
     setCurrentStepIndex(-1);
     setExecutionQueue([]);
     setShowWinModal(false);
+    setShowClearModal(false);
     setAttemptCount(0);
   }, [activeLevel]);
 
@@ -196,14 +198,23 @@ const App: React.FC = () => {
     setIsPlaying(false);
     setRobotState(getInitialState(activeLevel));
     setCurrentStepIndex(-1);
+    setExecutionQueue([]); // Clear execution queue
   };
 
-  const handleClear = () => {
+  const handleClearRequest = () => {
       if (isPlaying) return;
-      if (confirm("确定要清空所有指令吗？")) {
-          setProgram([]);
-          handleStop();
-      }
+      if (program.length === 0) return;
+      setShowClearModal(true);
+  };
+
+  const confirmClear = () => {
+      setProgram([]);
+      handleStop();
+      setRobotState(prev => ({
+          ...prev,
+          logs: [...prev.logs, ">> 指令序列已清空"]
+      }));
+      setShowClearModal(false);
   };
 
   const loadSolution = () => {
@@ -412,6 +423,7 @@ const App: React.FC = () => {
                         )}
 
                         <button 
+                            type="button"
                             onClick={handleRun} 
                             disabled={isPlaying || program.length === 0}
                             className={`flex-1 py-3 rounded-lg font-bold flex items-center justify-center gap-2 transition-all
@@ -425,6 +437,7 @@ const App: React.FC = () => {
                         </button>
 
                         <button 
+                            type="button"
                             onClick={handleStop}
                             className="px-4 py-3 bg-slate-700 hover:bg-slate-600 rounded-lg text-slate-300 transition-colors flex items-center justify-center"
                             title="重置模拟"
@@ -433,9 +446,12 @@ const App: React.FC = () => {
                         </button>
 
                         <button 
-                            onClick={handleClear}
-                            disabled={isPlaying}
-                            className="px-4 py-3 bg-slate-700 hover:bg-slate-600 hover:text-red-400 rounded-lg text-slate-300 transition-colors flex items-center justify-center"
+                            type="button"
+                            onClick={handleClearRequest}
+                            disabled={isPlaying || program.length === 0}
+                            className={`px-4 py-3 rounded-lg transition-colors flex items-center justify-center
+                                ${program.length === 0 || isPlaying ? 'bg-slate-800 text-slate-600' : 'bg-slate-700 hover:bg-slate-600 hover:text-red-400 text-slate-300'}
+                            `}
                             title="清空指令"
                         >
                             <Trash2 size={18} />
@@ -531,6 +547,33 @@ const App: React.FC = () => {
 
         </section>
       </main>
+
+      {/* Clear Confirmation Modal */}
+      {showClearModal && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 animate-fade-in">
+             <div className="bg-slate-900 border border-red-500/50 rounded-xl p-6 max-w-xs w-full shadow-2xl shadow-red-900/20 text-center">
+                 <div className="w-12 h-12 bg-red-500/10 rounded-full flex items-center justify-center mx-auto mb-4 border border-red-500/30">
+                     <Trash2 size={24} className="text-red-500" />
+                 </div>
+                 <h3 className="text-lg font-bold text-white mb-2">清空所有指令？</h3>
+                 <p className="text-slate-400 text-sm mb-6">此操作将移除当前所有的 {program.length} 条指令，无法撤销。</p>
+                 <div className="flex gap-3">
+                     <button 
+                        onClick={() => setShowClearModal(false)}
+                        className="flex-1 py-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-slate-300 font-bold transition-colors"
+                     >
+                         取消
+                     </button>
+                     <button 
+                        onClick={confirmClear}
+                        className="flex-1 py-2 bg-red-600 hover:bg-red-500 rounded-lg text-white font-bold transition-colors shadow-lg"
+                     >
+                         确认清空
+                     </button>
+                 </div>
+             </div>
+        </div>
+      )}
 
       {/* Win Modal */}
       {showWinModal && (
