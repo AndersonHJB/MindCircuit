@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Play, RotateCcw, Box, HelpCircle, CheckCircle, XCircle, Terminal, Trash2, Eye, Award, Zap, Hammer, Pencil, Eraser, Flag, Hexagon, User, Grid3x3, Settings, ChevronRight, AlertTriangle, Map } from 'lucide-react';
+import { Play, RotateCcw, Box, HelpCircle, CheckCircle, XCircle, Terminal, Trash2, Eye, Award, Zap, Hammer, Pencil, Eraser, Flag, Hexagon, User, Grid3x3, Settings, ChevronRight, AlertTriangle, Map, Download, Upload, Copy, FileJson, Clipboard } from 'lucide-react';
 import GridMap from './components/GridMap';
 import CodeBlocks from './components/CodeBlocks';
 import LevelSelect from './components/LevelSelect';
@@ -53,6 +53,11 @@ const App: React.FC = () => {
   const [customLevel, setCustomLevel] = useState<LevelConfig>(DEFAULT_CUSTOM_LEVEL);
   const [editorTool, setEditorTool] = useState<EditorTool>(EditorTool.Wall);
   const [isEditingCustom, setIsEditingCustom] = useState(false); // True = Editing Map, False = Playing Map
+  
+  // Import/Export Modal State
+  const [showShareModal, setShowShareModal] = useState(false);
+  const [shareMode, setShareMode] = useState<'import' | 'export'>('export');
+  const [shareData, setShareData] = useState(''); // Text for import/export
 
   // --- Shared Gameplay State ---
   const [program, setProgram] = useState<Block[]>([]);
@@ -221,6 +226,61 @@ const App: React.FC = () => {
           return updatedLevel;
       });
   };
+  
+  // --- Import / Export Handlers ---
+  const openExportModal = () => {
+      const data = JSON.stringify(customLevel, null, 2);
+      setShareData(data);
+      setShareMode('export');
+      setShowShareModal(true);
+  };
+
+  const openImportModal = () => {
+      setShareData('');
+      setShareMode('import');
+      setShowShareModal(true);
+  };
+
+  const handleImportLevel = () => {
+      try {
+          const parsed = JSON.parse(shareData);
+          // Basic validation
+          if (!parsed.gridSize || !Array.isArray(parsed.entities) || !parsed.startPos) {
+              throw new Error("Missing required level fields");
+          }
+          
+          // Sanitize fields to be safe
+          const importedLevel: LevelConfig = {
+              ...DEFAULT_CUSTOM_LEVEL,
+              ...parsed,
+              id: 999, // Force ID to creative
+              // Ensure we don't import extremely large grids that break UI
+              gridSize: Math.min(Math.max(3, parsed.gridSize), 12)
+          };
+
+          setCustomLevel(importedLevel);
+          setRobotState(getInitialState(importedLevel));
+          setShowShareModal(false);
+          // Add a log to indicate success
+          setRobotState(prev => ({
+              ...prev,
+              logs: [...prev.logs, ">> 外部地图数据导入成功"]
+          }));
+      } catch (e) {
+          alert("导入失败：无效的地图数据格式");
+      }
+  };
+
+  const copyToClipboard = () => {
+      navigator.clipboard.writeText(shareData).then(() => {
+          // Could add toast here, but for now simple alert or just UI feedback
+          const btn = document.getElementById('copy-btn');
+          if (btn) btn.innerText = "已复制!";
+          setTimeout(() => {
+             if (btn) btn.innerHTML = '复制数据'; 
+          }, 2000);
+      });
+  };
 
   const validateAndPlayCustomLevel = () => {
       const hasEnd = customLevel.entities.some(e => e.type === 'end');
@@ -341,11 +401,29 @@ const App: React.FC = () => {
   // Render Helpers
   const renderEditorTools = () => (
       <div className="bg-slate-800 p-4 rounded-xl border border-slate-700 space-y-4">
-          <div className="text-sm font-bold text-slate-400 uppercase tracking-widest mb-2 border-b border-slate-700 pb-2 flex items-center gap-2">
-              <Settings size={14} />
-              地图设置
+          <div className="text-sm font-bold text-slate-400 uppercase tracking-widest mb-2 border-b border-slate-700 pb-2 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                 <Settings size={14} />
+                 地图配置
+              </div>
           </div>
           
+          {/* Share / Import / Export */}
+          <div className="grid grid-cols-2 gap-2 mb-4">
+              <button 
+                onClick={openExportModal}
+                className="bg-slate-700 hover:bg-slate-600 text-slate-300 py-2 px-3 rounded-lg text-xs font-bold flex items-center justify-center gap-2 transition-colors"
+              >
+                  <Download size={14} /> 导出配置
+              </button>
+              <button 
+                onClick={openImportModal}
+                className="bg-slate-700 hover:bg-slate-600 text-slate-300 py-2 px-3 rounded-lg text-xs font-bold flex items-center justify-center gap-2 transition-colors"
+              >
+                  <Upload size={14} /> 导入配置
+              </button>
+          </div>
+
           {/* Grid Size Slider */}
           <div className="bg-slate-900/50 p-3 rounded-lg border border-slate-700/50 mb-2">
               <div className="flex justify-between items-center mb-2">
@@ -644,6 +722,67 @@ const App: React.FC = () => {
 
             </section>
         </main>
+      )}
+      
+      {/* Share / Import / Export Modal */}
+      {showShareModal && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-fade-in">
+           <div className="bg-slate-900 border border-purple-500/50 rounded-xl p-6 max-w-lg w-full shadow-2xl flex flex-col max-h-[90vh]">
+               <div className="flex items-center gap-3 mb-4 text-purple-400">
+                   {shareMode === 'export' ? <Download size={24} /> : <Upload size={24} />}
+                   <h3 className="text-xl font-bold">
+                       {shareMode === 'export' ? "导出地图数据" : "导入地图数据"}
+                   </h3>
+               </div>
+               
+               {shareMode === 'export' ? (
+                   <div className="mb-4">
+                       <p className="text-slate-400 text-sm mb-2">复制下方代码分享给其他玩家：</p>
+                       <div className="relative">
+                            <textarea 
+                                readOnly 
+                                value={shareData} 
+                                className="w-full h-48 bg-black/50 border border-slate-700 rounded p-3 text-xs font-mono text-cyan-300 focus:outline-none custom-scrollbar"
+                            />
+                            <button 
+                                id="copy-btn"
+                                onClick={copyToClipboard}
+                                className="absolute top-2 right-2 bg-purple-600 hover:bg-purple-500 text-white text-xs px-2 py-1 rounded flex items-center gap-1 shadow-lg"
+                            >
+                                <Copy size={12} /> 复制数据
+                            </button>
+                       </div>
+                   </div>
+               ) : (
+                   <div className="mb-4">
+                       <p className="text-slate-400 text-sm mb-2">在此处粘贴地图配置数据 (JSON)：</p>
+                       <textarea 
+                           value={shareData} 
+                           onChange={(e) => setShareData(e.target.value)}
+                           placeholder='{"id": 999, "name": "...", ...}'
+                           className="w-full h-48 bg-black/50 border border-slate-700 rounded p-3 text-xs font-mono text-white focus:outline-none focus:border-purple-500 custom-scrollbar"
+                       />
+                   </div>
+               )}
+
+               <div className="flex justify-end gap-3 pt-4 border-t border-slate-800">
+                   <button 
+                       onClick={() => setShowShareModal(false)}
+                       className="px-4 py-2 text-slate-400 hover:text-white transition-colors"
+                   >
+                       取消
+                   </button>
+                   {shareMode === 'import' && (
+                       <button 
+                           onClick={handleImportLevel}
+                           className="px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white rounded font-bold flex items-center gap-2 shadow-lg"
+                       >
+                           <Clipboard size={16} /> 读取并加载
+                       </button>
+                   )}
+               </div>
+           </div>
+        </div>
       )}
 
       {/* Clear Confirmation Modal */}
