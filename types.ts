@@ -13,6 +13,19 @@ export enum BlockType {
   Repeat = 'REPEAT',
 }
 
+export enum GameMode {
+  Story = 'STORY',
+  Creative = 'CREATIVE',
+}
+
+export enum EditorTool {
+  Start = 'START',
+  End = 'END',
+  Wall = 'WALL',
+  Coin = 'COIN',
+  Erase = 'ERASE',
+}
+
 export interface Block {
   id: string;
   type: BlockType;
