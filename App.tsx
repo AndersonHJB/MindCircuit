@@ -28,13 +28,24 @@ const App: React.FC = () => {
   
   // --- Story Mode Progress ---
   const [currentLevelId, setCurrentLevelId] = useState(1);
+  
+  // Load completed levels
   const [completedLevels, setCompletedLevels] = useState<number[]>(() => {
-      // Initialize from localStorage
       try {
           const saved = localStorage.getItem('gesture_coder_progress');
           return saved ? JSON.parse(saved) : [];
       } catch (e) {
           return [];
+      }
+  });
+
+  // Load saved solutions (programs)
+  const [savedSolutions, setSavedSolutions] = useState<Record<number, Block[]>>(() => {
+      try {
+          const saved = localStorage.getItem('gesture_coder_solutions');
+          return saved ? JSON.parse(saved) : {};
+      } catch (e) {
+          return {};
       }
   });
   
@@ -64,16 +75,41 @@ const App: React.FC = () => {
     ? (LEVELS.find(l => l.id === currentLevelId) || LEVELS[0])
     : customLevel;
 
-  // Persist progress
+  // Persist progress and solutions
   useEffect(() => {
       localStorage.setItem('gesture_coder_progress', JSON.stringify(completedLevels));
   }, [completedLevels]);
 
-  // Initialize level when ID changes or Mode changes
   useEffect(() => {
-    resetLevel();
+      localStorage.setItem('gesture_coder_solutions', JSON.stringify(savedSolutions));
+  }, [savedSolutions]);
+
+  // Initialize level when ID changes or Mode changes
+  // This effect handles "Loading" the level state (clearing or loading saved code)
+  useEffect(() => {
+    // 1. Determine initial program
+    let initialProgram: Block[] = [];
+    
+    if (gameMode === GameMode.Story) {
+        // If we have a saved solution for this level, load it
+        if (savedSolutions[currentLevelId]) {
+            initialProgram = savedSolutions[currentLevelId];
+        }
+    }
+    
+    setProgram(initialProgram);
+
+    // 2. Reset Runtime State
+    setRobotState(getInitialState(activeLevel));
+    setIsPlaying(false);
+    setCurrentStepIndex(-1);
+    setExecutionQueue([]);
+    setShowWinModal(false);
+    setShowClearModal(false);
+    setAttemptCount(0);
+    
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentLevelId, gameMode]);
+  }, [currentLevelId, gameMode]); // Intentionally omitting savedSolutions to prevent reset on save
 
   // Special reset for entering Creative Mode & Auto-Adaptation
   useEffect(() => {
@@ -101,17 +137,6 @@ const App: React.FC = () => {
   useEffect(() => {
       logsEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [robotState.logs]);
-
-  const resetLevel = useCallback(() => {
-    setProgram([]);
-    setRobotState(getInitialState(activeLevel));
-    setIsPlaying(false);
-    setCurrentStepIndex(-1);
-    setExecutionQueue([]);
-    setShowWinModal(false);
-    setShowClearModal(false);
-    setAttemptCount(0);
-  }, [activeLevel]);
 
   // --- Level Selection Logic ---
   const handleSelectLevel = (id: number) => {
@@ -204,7 +229,13 @@ const App: React.FC = () => {
           return;
       }
       setIsEditingCustom(false);
-      resetLevel(); 
+      // Reset logic for Custom Level transition
+      setRobotState(getInitialState(customLevel));
+      setIsPlaying(false);
+      setCurrentStepIndex(-1);
+      setExecutionQueue([]);
+      setShowWinModal(false);
+      setAttemptCount(0);
   };
 
   const backToEdit = () => {
@@ -279,12 +310,18 @@ const App: React.FC = () => {
              setIsPlaying(false);
              // Logic when winning
              if (gameMode === GameMode.Story) {
+                 // 1. Mark level as completed
                  setCompletedLevels(prev => {
                      if (!prev.includes(activeLevel.id)) {
                          return [...prev, activeLevel.id];
                      }
                      return prev;
                  });
+                 // 2. Save the winning code (Solution)
+                 setSavedSolutions(prev => ({
+                     ...prev,
+                     [activeLevel.id]: program
+                 }));
              }
              setShowWinModal(true);
            }
@@ -296,7 +333,7 @@ const App: React.FC = () => {
       setIsPlaying(false);
     }
     return () => clearTimeout(timer);
-  }, [isPlaying, currentStepIndex, executionQueue, activeLevel, playbackSpeed, gameMode]);
+  }, [isPlaying, currentStepIndex, executionQueue, activeLevel, playbackSpeed, gameMode, program]);
 
   const isOptimal = gameMode === GameMode.Story ? program.length <= activeLevel.optimalBlocks : true;
   const isOneShot = attemptCount === 1;
