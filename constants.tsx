@@ -28,11 +28,11 @@ export const LEVELS: LevelConfig[] = [
     name: "直角转弯",
     description: "使用转向指令，绕过前方的防火墙。",
     gridSize: 5,
-    startPos: { x: 1, y: 4 },
+    startPos: { x: 1, y: 3 },
     startDir: Direction.North,
     entities: [
       { id: 'e1', type: 'end', x: 3, y: 1 },
-      { id: 'w1', type: 'wall', x: 1, y: 2 },
+      // Removed wall at 1,2 to create a gap
       { id: 'w2', type: 'wall', x: 2, y: 2 },
       { id: 'w3', type: 'wall', x: 3, y: 2 },
     ],
@@ -57,9 +57,7 @@ export const LEVELS: LevelConfig[] = [
       { id: 'c1', type: 'coin', x: 2, y: 0 },
       { id: 'c2', type: 'coin', x: 4, y: 0 },
       { id: 'e1', type: 'end', x: 5, y: 5 },
-      { id: 'w1', type: 'wall', x: 5, y: 0 },
-      { id: 'w2', type: 'wall', x: 5, y: 1 },
-      { id: 'w3', type: 'wall', x: 5, y: 2 },
+      // Removed walls at x=5 to allow the loop path to complete
     ],
     optimalBlocks: 3, 
     availableBlocks: [BlockType.Move, BlockType.TurnRight, BlockType.Repeat],
