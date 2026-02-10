@@ -58,6 +58,9 @@ const App: React.FC = () => {
   const [showShareModal, setShowShareModal] = useState(false);
   const [shareMode, setShareMode] = useState<'import' | 'export'>('export');
   const [shareData, setShareData] = useState(''); // Text for import/export
+  
+  // Ref for file input
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // --- Shared Gameplay State ---
   const [program, setProgram] = useState<Block[]>([]);
@@ -239,6 +242,33 @@ const App: React.FC = () => {
       setShareData('');
       setShareMode('import');
       setShowShareModal(true);
+  };
+  
+  const handleDownload = () => {
+      const blob = new Blob([shareData], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `gesture-coder-map-${Date.now()}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+  };
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (file) {
+          const reader = new FileReader();
+          reader.onload = (event) => {
+              if (event.target?.result) {
+                  setShareData(event.target.result as string);
+                  // Reset input value so the same file can be selected again if needed
+                  if (fileInputRef.current) fileInputRef.current.value = '';
+              }
+          };
+          reader.readAsText(file);
+      }
   };
 
   const handleImportLevel = () => {
@@ -737,8 +767,8 @@ const App: React.FC = () => {
                
                {shareMode === 'export' ? (
                    <div className="mb-4">
-                       <p className="text-slate-400 text-sm mb-2">复制下方代码分享给其他玩家：</p>
-                       <div className="relative">
+                       <p className="text-slate-400 text-sm mb-2">复制下方代码或下载文件分享：</p>
+                       <div className="relative mb-3">
                             <textarea 
                                 readOnly 
                                 value={shareData} 
@@ -749,13 +779,34 @@ const App: React.FC = () => {
                                 onClick={copyToClipboard}
                                 className="absolute top-2 right-2 bg-purple-600 hover:bg-purple-500 text-white text-xs px-2 py-1 rounded flex items-center gap-1 shadow-lg"
                             >
-                                <Copy size={12} /> 复制数据
+                                <Copy size={12} /> 复制
                             </button>
                        </div>
+                       <button 
+                            onClick={handleDownload}
+                            className="w-full py-2 bg-slate-800 hover:bg-slate-700 border border-slate-600 rounded text-cyan-400 text-sm font-bold flex items-center justify-center gap-2 transition-colors"
+                        >
+                            <Download size={16} /> 下载配置文件 (.JSON)
+                        </button>
                    </div>
                ) : (
                    <div className="mb-4">
-                       <p className="text-slate-400 text-sm mb-2">在此处粘贴地图配置数据 (JSON)：</p>
+                       <div className="flex justify-between items-center mb-2">
+                           <p className="text-slate-400 text-sm">粘贴代码或上传文件：</p>
+                           <button 
+                              onClick={() => fileInputRef.current?.click()}
+                              className="text-xs bg-slate-800 hover:bg-slate-700 text-cyan-400 px-2 py-1 rounded border border-slate-600 flex items-center gap-1"
+                           >
+                              <Upload size={12} /> 上传文件
+                           </button>
+                           <input 
+                              type="file"
+                              ref={fileInputRef}
+                              className="hidden"
+                              accept=".json,.txt"
+                              onChange={handleFileSelect}
+                           />
+                       </div>
                        <textarea 
                            value={shareData} 
                            onChange={(e) => setShareData(e.target.value)}
