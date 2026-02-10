@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Play, RotateCcw, Box, HelpCircle, CheckCircle, XCircle, Terminal, Trash2, Eye, Award, Zap, Hammer, Pencil, Eraser, Flag, Hexagon, User, Grid3x3, Settings, ChevronRight, AlertTriangle } from 'lucide-react';
+import { Play, RotateCcw, Box, HelpCircle, CheckCircle, XCircle, Terminal, Trash2, Eye, Award, Zap, Hammer, Pencil, Eraser, Flag, Hexagon, User, Grid3x3, Settings, ChevronRight, AlertTriangle, Map } from 'lucide-react';
 import GridMap from './components/GridMap';
 import CodeBlocks from './components/CodeBlocks';
+import LevelSelect from './components/LevelSelect';
 import { LEVELS } from './constants';
 import { compileProgram, executeStep, getInitialState } from './services/engine';
 import { Block, BlockType, RobotState, SolutionBlockDef, LevelConfig, Direction, GameMode, EditorTool, Entity } from './types';
@@ -23,9 +24,19 @@ const DEFAULT_CUSTOM_LEVEL: LevelConfig = {
 const App: React.FC = () => {
   // --- Global State ---
   const [gameMode, setGameMode] = useState<GameMode>(GameMode.Story);
+  const [viewState, setViewState] = useState<'map' | 'game'>('map'); // Control between Level Map and Game
   
-  // --- Story Mode State ---
+  // --- Story Mode Progress ---
   const [currentLevelId, setCurrentLevelId] = useState(1);
+  const [completedLevels, setCompletedLevels] = useState<number[]>(() => {
+      // Initialize from localStorage
+      try {
+          const saved = localStorage.getItem('gesture_coder_progress');
+          return saved ? JSON.parse(saved) : [];
+      } catch (e) {
+          return [];
+      }
+  });
   
   // --- Creative Mode State ---
   const [customLevel, setCustomLevel] = useState<LevelConfig>(DEFAULT_CUSTOM_LEVEL);
@@ -53,6 +64,11 @@ const App: React.FC = () => {
     ? (LEVELS.find(l => l.id === currentLevelId) || LEVELS[0])
     : customLevel;
 
+  // Persist progress
+  useEffect(() => {
+      localStorage.setItem('gesture_coder_progress', JSON.stringify(completedLevels));
+  }, [completedLevels]);
+
   // Initialize level when ID changes or Mode changes
   useEffect(() => {
     resetLevel();
@@ -62,6 +78,7 @@ const App: React.FC = () => {
   // Special reset for entering Creative Mode & Auto-Adaptation
   useEffect(() => {
      if (gameMode === GameMode.Creative) {
+         setViewState('game'); // Creative always shows game view
          // Auto-adapt grid size based on screen width
          const isMobile = window.innerWidth < 768;
          const defaultSize = isMobile ? 5 : 8;
@@ -74,6 +91,9 @@ const App: React.FC = () => {
          setCustomLevel(newLevel);
          setIsEditingCustom(true);
          setRobotState(getInitialState(newLevel));
+     } else {
+         // Switch to story, show map by default if switching modes
+         setViewState('map');
      }
   }, [gameMode]);
 
@@ -92,6 +112,17 @@ const App: React.FC = () => {
     setShowClearModal(false);
     setAttemptCount(0);
   }, [activeLevel]);
+
+  // --- Level Selection Logic ---
+  const handleSelectLevel = (id: number) => {
+      setCurrentLevelId(id);
+      setViewState('game');
+  };
+
+  const handleReturnToMap = () => {
+      handleStop();
+      setViewState('map');
+  };
 
   // --- Creative Mode: Map Editing Logic ---
   const handleCellClick = (x: number, y: number) => {
@@ -246,6 +277,15 @@ const App: React.FC = () => {
            if (newState.crashed) setIsPlaying(false);
            if (newState.won) {
              setIsPlaying(false);
+             // Logic when winning
+             if (gameMode === GameMode.Story) {
+                 setCompletedLevels(prev => {
+                     if (!prev.includes(activeLevel.id)) {
+                         return [...prev, activeLevel.id];
+                     }
+                     return prev;
+                 });
+             }
              setShowWinModal(true);
            }
            return newState;
@@ -256,7 +296,7 @@ const App: React.FC = () => {
       setIsPlaying(false);
     }
     return () => clearTimeout(timer);
-  }, [isPlaying, currentStepIndex, executionQueue, activeLevel, playbackSpeed]);
+  }, [isPlaying, currentStepIndex, executionQueue, activeLevel, playbackSpeed, gameMode]);
 
   const isOptimal = gameMode === GameMode.Story ? program.length <= activeLevel.optimalBlocks : true;
   const isOneShot = attemptCount === 1;
@@ -358,7 +398,7 @@ const App: React.FC = () => {
              </h1>
              <div className="text-[10px] text-slate-400 tracking-widest uppercase">
                {gameMode === GameMode.Story 
-                  ? `第 ${activeLevel.id} 关: ${activeLevel.name}`
+                  ? (viewState === 'map' ? "选择关卡" : `第 ${activeLevel.id} 关: ${activeLevel.name}`)
                   : isEditingCustom ? "编辑模式" : "测试模式"
                }
              </div>
@@ -366,10 +406,24 @@ const App: React.FC = () => {
         </div>
 
         <div className="flex items-center space-x-4">
+             {/* Map Toggle Button (Only in Story Mode and Game View) */}
+             {gameMode === GameMode.Story && viewState === 'game' && (
+                 <button 
+                    onClick={handleReturnToMap}
+                    className="flex items-center gap-2 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 border border-slate-600 rounded-lg text-xs font-bold text-cyan-400 transition-colors"
+                 >
+                    <Map size={14} />
+                    <span className="hidden sm:inline">地图</span>
+                 </button>
+             )}
+
              {/* Mode Switcher */}
              <div className="flex bg-slate-800 p-1 rounded-lg border border-slate-700 hidden md:flex">
                  <button 
-                    onClick={() => setGameMode(GameMode.Story)}
+                    onClick={() => {
+                        setGameMode(GameMode.Story);
+                        setViewState('map');
+                    }}
                     className={`px-3 py-1 text-xs font-bold rounded flex items-center gap-2 transition-all ${gameMode === GameMode.Story ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-white'}`}
                  >
                     <Box size={14} /> 剧情模式
@@ -391,162 +445,169 @@ const App: React.FC = () => {
                     {gameMode === GameMode.Story ? <User size={20} className="text-purple-400"/> : <Box size={20} className="text-blue-400"/>}
                  </button>
              </div>
-
-             <button className="p-2 text-slate-400 hover:text-white transition-colors" title="Help">
-                 <HelpCircle size={20} />
-             </button>
         </div>
       </header>
 
-      {/* Main Content */}
-      <main className="flex-1 flex flex-col md:flex-row overflow-hidden relative">
-        
-        {/* Left Panel: Content changes based on Mode and Phase */}
-        <section className="order-2 md:order-1 h-1/2 md:h-full w-full md:w-1/3 max-w-md p-4 flex flex-col space-y-4 border-t md:border-t-0 md:border-r border-slate-800 bg-slate-900/50 z-20">
+      {/* Main Content Area */}
+      {gameMode === GameMode.Story && viewState === 'map' ? (
+        <main className="flex-1 overflow-hidden relative">
+            <LevelSelect 
+                levels={LEVELS} 
+                completedLevels={completedLevels} 
+                currentLevelId={currentLevelId} 
+                onSelectLevel={handleSelectLevel} 
+            />
+        </main>
+      ) : (
+        <main className="flex-1 flex flex-col md:flex-row overflow-hidden relative">
             
-            {/* If in Creative Edit Mode, show Editor Tools. Otherwise show Code Blocks */}
-            {gameMode === GameMode.Creative && isEditingCustom ? (
-                renderEditorTools()
-            ) : (
-                <>
-                    {/* Control Bar */}
-                    <div className="bg-slate-800 p-3 rounded-xl border border-slate-700 flex gap-2 shrink-0">
-                        {gameMode === GameMode.Creative && (
-                             <button 
-                                onClick={backToEdit}
-                                disabled={isPlaying}
-                                className="px-3 bg-purple-600 hover:bg-purple-500 rounded-lg text-white transition-colors flex items-center justify-center font-bold"
-                                title="返回编辑"
-                             >
-                                 <Pencil size={18} />
-                             </button>
-                        )}
+            {/* Left Panel: Content changes based on Mode and Phase */}
+            <section className="order-2 md:order-1 h-1/2 md:h-full w-full md:w-1/3 max-w-md p-4 flex flex-col space-y-4 border-t md:border-t-0 md:border-r border-slate-800 bg-slate-900/50 z-20">
+                
+                {/* If in Creative Edit Mode, show Editor Tools. Otherwise show Code Blocks */}
+                {gameMode === GameMode.Creative && isEditingCustom ? (
+                    renderEditorTools()
+                ) : (
+                    <>
+                        {/* Control Bar */}
+                        <div className="bg-slate-800 p-3 rounded-xl border border-slate-700 flex gap-2 shrink-0">
+                            {gameMode === GameMode.Creative && (
+                                <button 
+                                    onClick={backToEdit}
+                                    disabled={isPlaying}
+                                    className="px-3 bg-purple-600 hover:bg-purple-500 rounded-lg text-white transition-colors flex items-center justify-center font-bold"
+                                    title="返回编辑"
+                                >
+                                    <Pencil size={18} />
+                                </button>
+                            )}
 
-                        <button 
-                            type="button"
-                            onClick={handleRun} 
-                            disabled={isPlaying || program.length === 0}
-                            className={`flex-1 py-3 rounded-lg font-bold flex items-center justify-center gap-2 transition-all
-                            ${isPlaying 
-                                ? 'bg-slate-700 text-slate-500' 
-                                : 'bg-green-600 hover:bg-green-500 text-white shadow-lg shadow-green-900/20 active:translate-y-0.5'}
-                            `}
-                        >
-                            <Play size={18} fill="currentColor" />
-                            执行
-                        </button>
+                            <button 
+                                type="button"
+                                onClick={handleRun} 
+                                disabled={isPlaying || program.length === 0}
+                                className={`flex-1 py-3 rounded-lg font-bold flex items-center justify-center gap-2 transition-all
+                                ${isPlaying 
+                                    ? 'bg-slate-700 text-slate-500' 
+                                    : 'bg-green-600 hover:bg-green-500 text-white shadow-lg shadow-green-900/20 active:translate-y-0.5'}
+                                `}
+                            >
+                                <Play size={18} fill="currentColor" />
+                                执行
+                            </button>
 
-                        <button 
-                            type="button"
-                            onClick={handleStop}
-                            className="px-4 py-3 bg-slate-700 hover:bg-slate-600 rounded-lg text-slate-300 transition-colors flex items-center justify-center"
-                            title="重置模拟"
-                        >
-                            <RotateCcw size={18} />
-                        </button>
+                            <button 
+                                type="button"
+                                onClick={handleStop}
+                                className="px-4 py-3 bg-slate-700 hover:bg-slate-600 rounded-lg text-slate-300 transition-colors flex items-center justify-center"
+                                title="重置模拟"
+                            >
+                                <RotateCcw size={18} />
+                            </button>
 
-                        <button 
-                            type="button"
-                            onClick={handleClearRequest}
-                            disabled={isPlaying || program.length === 0}
-                            className={`px-4 py-3 rounded-lg transition-colors flex items-center justify-center
-                                ${program.length === 0 || isPlaying ? 'bg-slate-800 text-slate-600' : 'bg-slate-700 hover:bg-slate-600 hover:text-red-400 text-slate-300'}
-                            `}
-                            title="清空指令"
-                        >
-                            <Trash2 size={18} />
-                        </button>
-                    </div>
-
-                    <div className="flex-1 min-h-0 flex flex-col">
-                        <div className="mb-2 flex justify-between items-center px-1">
-                            <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">程序指令序列</span>
-                            <span className="text-[10px] text-slate-500 font-mono">
-                                {gameMode === GameMode.Story ? "LIMIT: " + activeLevel.optimalBlocks : "UNLIMITED"}
-                            </span>
+                            <button 
+                                type="button"
+                                onClick={handleClearRequest}
+                                disabled={isPlaying || program.length === 0}
+                                className={`px-4 py-3 rounded-lg transition-colors flex items-center justify-center
+                                    ${program.length === 0 || isPlaying ? 'bg-slate-800 text-slate-600' : 'bg-slate-700 hover:bg-slate-600 hover:text-red-400 text-slate-300'}
+                                `}
+                                title="清空指令"
+                            >
+                                <Trash2 size={18} />
+                            </button>
                         </div>
-                        <CodeBlocks 
-                            program={program} 
-                            setProgram={setProgram} 
-                            level={activeLevel} 
-                            isPlaying={isPlaying}
-                            activeBlockIndex={currentStepIndex} 
-                            attemptCount={attemptCount}
-                        />
+
+                        <div className="flex-1 min-h-0 flex flex-col">
+                            <div className="mb-2 flex justify-between items-center px-1">
+                                <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">程序指令序列</span>
+                                <span className="text-[10px] text-slate-500 font-mono">
+                                    {gameMode === GameMode.Story ? "LIMIT: " + activeLevel.optimalBlocks : "UNLIMITED"}
+                                </span>
+                            </div>
+                            <CodeBlocks 
+                                program={program} 
+                                setProgram={setProgram} 
+                                level={activeLevel} 
+                                isPlaying={isPlaying}
+                                activeBlockIndex={currentStepIndex} 
+                                attemptCount={attemptCount}
+                            />
+                        </div>
+                    </>
+                )}
+            </section>
+
+            {/* Right Panel: Simulation / Grid Map */}
+            <section className="order-1 md:order-2 flex-1 relative bg-slate-950 flex flex-col overflow-hidden">
+                
+                {/* Top Error Banner */}
+                <div className="absolute top-4 left-0 right-0 px-6 z-30 pointer-events-none flex justify-center">
+                    {robotState.crashed && (
+                        <div className="bg-red-900/90 backdrop-blur border border-red-500 text-red-100 px-4 py-2 rounded-lg flex items-center justify-center gap-3 shadow-[0_0_20px_rgba(239,68,68,0.4)] animate-fade-in pointer-events-auto">
+                            <XCircle size={20} className="text-red-400" />
+                            <span className="text-sm font-bold">发生碰撞！系统停止。</span>
+                            <button onClick={handleStop} className="ml-2 text-xs bg-red-800 hover:bg-red-700 px-2 py-1 rounded border border-red-700">重置</button>
+                        </div>
+                    )}
+                    {gameMode === GameMode.Creative && isEditingCustom && (
+                        <div className="bg-purple-900/80 backdrop-blur border border-purple-500 text-purple-100 px-4 py-2 rounded-lg flex items-center justify-center gap-2 shadow-xl animate-fade-in">
+                            <Pencil size={16} />
+                            <span className="text-xs font-bold">编辑模式：点击网格放置元素</span>
+                        </div>
+                    )}
+                </div>
+
+                {/* Grid Container - Flexible space */}
+                <div className="flex-1 min-h-0 flex items-center justify-center p-4 relative z-10">
+                    <GridMap 
+                        level={activeLevel} 
+                        robotState={robotState} 
+                        isEditing={gameMode === GameMode.Creative && isEditingCustom}
+                        onCellClick={handleCellClick}
+                    />
+                </div>
+
+                {/* Logs / Console - Fixed Height at bottom */}
+                <div className="shrink-0 w-full z-20 px-4 pb-4 md:px-8">
+                <div className="w-full max-w-3xl mx-auto bg-slate-900/90 rounded-xl border border-slate-700 shadow-2xl backdrop-blur-md overflow-hidden flex flex-col transition-all duration-300">
+                    {/* Terminal Header */}
+                    <div className="h-8 bg-black/40 border-b border-slate-700/50 flex items-center justify-between px-3">
+                        <div className="flex items-center gap-2">
+                            <Terminal size={14} className="text-cyan-500" />
+                            <span className="text-[10px] font-mono font-bold text-slate-400 tracking-widest">SYSTEM_LOGS // V.2.4</span>
+                        </div>
+                        <div className="flex gap-1.5">
+                            <div className={`w-2 h-2 rounded-full ${isPlaying ? 'bg-green-500 animate-pulse' : 'bg-slate-600'}`} />
+                            <div className="w-2 h-2 rounded-full bg-slate-700" />
+                        </div>
                     </div>
-                </>
-            )}
-        </section>
+                    
+                    {/* Terminal Content */}
+                    <div className="h-28 md:h-36 overflow-y-auto p-3 font-mono text-xs custom-scrollbar bg-black/20 space-y-1">
+                        {robotState.logs.length === 0 && <span className="text-slate-600 italic opacity-50">...等待输入...</span>}
+                        {robotState.logs.map((log, i) => (
+                            <div key={i} className="animate-fade-in flex items-start">
+                                <span className="text-slate-600 mr-2 shrink-0">{`>`}</span>
+                                <span className={log.includes('错误') || log.includes('碰撞') ? 'text-red-400' : log.includes('达成') ? 'text-green-400 font-bold' : log.includes('获得') ? 'text-yellow-400' : 'text-cyan-100'}>
+                                    {log}
+                                </span>
+                            </div>
+                        ))}
+                        <div ref={logsEndRef} />
+                    </div>
+                </div>
+                </div>
 
-        {/* Right Panel: Simulation / Grid Map */}
-        <section className="order-1 md:order-2 flex-1 relative bg-slate-950 flex flex-col overflow-hidden">
-            
-            {/* Top Error Banner */}
-            <div className="absolute top-4 left-0 right-0 px-6 z-30 pointer-events-none flex justify-center">
-                 {robotState.crashed && (
-                     <div className="bg-red-900/90 backdrop-blur border border-red-500 text-red-100 px-4 py-2 rounded-lg flex items-center justify-center gap-3 shadow-[0_0_20px_rgba(239,68,68,0.4)] animate-fade-in pointer-events-auto">
-                        <XCircle size={20} className="text-red-400" />
-                        <span className="text-sm font-bold">发生碰撞！系统停止。</span>
-                        <button onClick={handleStop} className="ml-2 text-xs bg-red-800 hover:bg-red-700 px-2 py-1 rounded border border-red-700">重置</button>
-                     </div>
-                 )}
-                 {gameMode === GameMode.Creative && isEditingCustom && (
-                     <div className="bg-purple-900/80 backdrop-blur border border-purple-500 text-purple-100 px-4 py-2 rounded-lg flex items-center justify-center gap-2 shadow-xl animate-fade-in">
-                        <Pencil size={16} />
-                        <span className="text-xs font-bold">编辑模式：点击网格放置元素</span>
-                     </div>
-                 )}
-            </div>
+                {/* Background Decoration */}
+                <div className="absolute inset-0 z-0 overflow-hidden pointer-events-none">
+                    <div className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] rounded-full blur-3xl filter transition-colors duration-1000 ${gameMode === GameMode.Story ? 'bg-blue-900/10' : 'bg-purple-900/10'}`} />
+                    <div className="absolute top-0 right-0 w-96 h-96 bg-cyan-900/5 rounded-full blur-3xl filter" />
+                </div>
 
-            {/* Grid Container - Flexible space */}
-            <div className="flex-1 min-h-0 flex items-center justify-center p-4 relative z-10">
-                <GridMap 
-                    level={activeLevel} 
-                    robotState={robotState} 
-                    isEditing={gameMode === GameMode.Creative && isEditingCustom}
-                    onCellClick={handleCellClick}
-                />
-            </div>
-
-            {/* Logs / Console - Fixed Height at bottom */}
-            <div className="shrink-0 w-full z-20 px-4 pb-4 md:px-8">
-               <div className="w-full max-w-3xl mx-auto bg-slate-900/90 rounded-xl border border-slate-700 shadow-2xl backdrop-blur-md overflow-hidden flex flex-col transition-all duration-300">
-                  {/* Terminal Header */}
-                  <div className="h-8 bg-black/40 border-b border-slate-700/50 flex items-center justify-between px-3">
-                      <div className="flex items-center gap-2">
-                           <Terminal size={14} className="text-cyan-500" />
-                           <span className="text-[10px] font-mono font-bold text-slate-400 tracking-widest">SYSTEM_LOGS // V.2.4</span>
-                      </div>
-                      <div className="flex gap-1.5">
-                           <div className={`w-2 h-2 rounded-full ${isPlaying ? 'bg-green-500 animate-pulse' : 'bg-slate-600'}`} />
-                           <div className="w-2 h-2 rounded-full bg-slate-700" />
-                      </div>
-                  </div>
-                  
-                  {/* Terminal Content */}
-                  <div className="h-28 md:h-36 overflow-y-auto p-3 font-mono text-xs custom-scrollbar bg-black/20 space-y-1">
-                      {robotState.logs.length === 0 && <span className="text-slate-600 italic opacity-50">...等待输入...</span>}
-                      {robotState.logs.map((log, i) => (
-                          <div key={i} className="animate-fade-in flex items-start">
-                              <span className="text-slate-600 mr-2 shrink-0">{`>`}</span>
-                              <span className={log.includes('错误') || log.includes('碰撞') ? 'text-red-400' : log.includes('达成') ? 'text-green-400 font-bold' : log.includes('获得') ? 'text-yellow-400' : 'text-cyan-100'}>
-                                {log}
-                              </span>
-                          </div>
-                      ))}
-                      <div ref={logsEndRef} />
-                  </div>
-               </div>
-            </div>
-
-            {/* Background Decoration */}
-            <div className="absolute inset-0 z-0 overflow-hidden pointer-events-none">
-                 <div className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] rounded-full blur-3xl filter transition-colors duration-1000 ${gameMode === GameMode.Story ? 'bg-blue-900/10' : 'bg-purple-900/10'}`} />
-                 <div className="absolute top-0 right-0 w-96 h-96 bg-cyan-900/5 rounded-full blur-3xl filter" />
-            </div>
-
-        </section>
-      </main>
+            </section>
+        </main>
+      )}
 
       {/* Clear Confirmation Modal */}
       {showClearModal && (
@@ -616,21 +677,35 @@ const App: React.FC = () => {
               
               <div className="flex flex-col gap-3">
                   {gameMode === GameMode.Story ? (
+                    <>
+                      {currentLevelId < LEVELS.length ? (
+                          <button 
+                            onClick={() => {
+                                setCurrentLevelId(id => id + 1);
+                                setShowWinModal(false);
+                            }}
+                            className={`w-full py-3 font-bold rounded-xl transition-all shadow-lg active:scale-95 text-white flex items-center justify-center gap-2
+                                ${isOptimal ? 'bg-green-600 hover:bg-green-500' : 'bg-blue-600 hover:bg-blue-500'}
+                            `}
+                          >
+                             下一关 <ChevronRight size={18} />
+                          </button>
+                      ) : (
+                          <div className="text-center text-cyan-400 font-bold mb-2">
+                              所有关卡已完成！
+                          </div>
+                      )}
+                      
                       <button 
                         onClick={() => {
-                           if (currentLevelId < LEVELS.length) {
-                               setCurrentLevelId(id => id + 1);
-                           } else {
-                               setCurrentLevelId(1); // Loop back
-                           }
-                           setShowWinModal(false);
+                            setShowWinModal(false);
+                            setViewState('map');
                         }}
-                        className={`w-full py-3 font-bold rounded-xl transition-all shadow-lg active:scale-95 text-white
-                            ${isOptimal ? 'bg-green-600 hover:bg-green-500' : 'bg-blue-600 hover:bg-blue-500'}
-                        `}
+                        className="w-full py-3 bg-slate-800 hover:bg-slate-700 border border-slate-600 text-slate-300 font-bold rounded-xl transition-all flex items-center justify-center gap-2"
                       >
-                          {currentLevelId < LEVELS.length ? "下一关" : "重新开始"}
+                         <Map size={18} /> 返回地图
                       </button>
+                    </>
                   ) : (
                        <button 
                         onClick={() => {
@@ -646,9 +721,9 @@ const App: React.FC = () => {
                   {!isOptimal && gameMode === GameMode.Story && (
                       <button 
                         onClick={loadSolution}
-                        className="w-full py-3 bg-slate-800 hover:bg-slate-700 text-yellow-400 font-bold rounded-xl transition-all border border-slate-700 flex items-center justify-center gap-2"
+                        className="w-full py-2 bg-transparent hover:bg-slate-800 text-yellow-500/80 font-bold rounded-xl transition-all text-xs flex items-center justify-center gap-2"
                       >
-                         <Eye size={18} />
+                         <Eye size={14} />
                          查看最佳方案
                       </button>
                   )}
