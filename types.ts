@@ -61,6 +61,7 @@ export interface LevelConfig {
   optimalBlocks: number; // The target number of blocks for a "Perfect" score
   availableBlocks: BlockType[];
   solution: SolutionBlockDef[]; // The correct answer
+  timeLimit?: number; // Time limit in seconds
 }
 
 export interface RobotState {
@@ -71,4 +72,5 @@ export interface RobotState {
   won: boolean;
   collectedCoins: string[]; // IDs of collected coins
   logs: string[];
+  timedOut?: boolean; // If the run failed due to time limit
 }

@@ -21,7 +21,8 @@ export const LEVELS: LevelConfig[] = [
       { type: BlockType.Move },
       { type: BlockType.Move },
       { type: BlockType.Move },
-    ]
+    ],
+    timeLimit: 30
   },
   {
     id: 2,
@@ -43,7 +44,8 @@ export const LEVELS: LevelConfig[] = [
       { type: BlockType.TurnRight },
       { type: BlockType.Move },
       { type: BlockType.Move },
-    ]
+    ],
+    timeLimit: 45
   },
   {
     id: 3,
@@ -71,7 +73,8 @@ export const LEVELS: LevelConfig[] = [
         value: 5, 
         children: [{ type: BlockType.Move }] 
       },
-    ]
+    ],
+    timeLimit: 60
   },
   {
     id: 4,
@@ -88,7 +91,8 @@ export const LEVELS: LevelConfig[] = [
     ],
     optimalBlocks: 6,
     availableBlocks: [BlockType.Move, BlockType.TurnLeft, BlockType.TurnRight, BlockType.Repeat],
-    solution: []
+    solution: [],
+    timeLimit: 60
   },
   {
     id: 5,
@@ -108,7 +112,8 @@ export const LEVELS: LevelConfig[] = [
     ],
     optimalBlocks: 5,
     availableBlocks: [BlockType.Move, BlockType.MoveBack, BlockType.TurnLeft, BlockType.TurnRight],
-    solution: []
+    solution: [],
+    timeLimit: 90
   },
   {
     id: 6,
@@ -126,7 +131,8 @@ export const LEVELS: LevelConfig[] = [
     ],
     optimalBlocks: 4,
     availableBlocks: [BlockType.Move, BlockType.TurnRight, BlockType.Repeat],
-    solution: []
+    solution: [],
+    timeLimit: 90
   },
   {
     id: 7,
@@ -146,7 +152,8 @@ export const LEVELS: LevelConfig[] = [
     ],
     optimalBlocks: 6,
     availableBlocks: [BlockType.Move, BlockType.TurnRight, BlockType.TurnLeft, BlockType.Repeat],
-    solution: []
+    solution: [],
+    timeLimit: 120
   },
   {
     id: 8,
@@ -169,7 +176,8 @@ export const LEVELS: LevelConfig[] = [
     ],
     optimalBlocks: 10,
     availableBlocks: [BlockType.Move, BlockType.MoveBack, BlockType.TurnLeft, BlockType.TurnRight, BlockType.Repeat],
-    solution: []
+    solution: [],
+    timeLimit: 180
   }
 ];
 

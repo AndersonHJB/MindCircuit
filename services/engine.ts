@@ -52,7 +52,7 @@ export const executeStep = (
   const nextState = cloneState(currentState);
   const { gridSize, entities } = level;
 
-  if (nextState.crashed || nextState.won) return nextState;
+  if (nextState.crashed || nextState.won || nextState.timedOut) return nextState;
 
   if (command.type === BlockType.TurnLeft) {
     nextState.dir = (nextState.dir + 3) % 4;
@@ -103,4 +103,5 @@ export const getInitialState = (level: LevelConfig): RobotState => ({
   won: false,
   collectedCoins: [],
   logs: ["系统在线。等待指令输入。"],
+  timedOut: false,
 });

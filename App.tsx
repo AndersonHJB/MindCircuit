@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Play, RotateCcw, Box, HelpCircle, CheckCircle, XCircle, Terminal, Trash2, Eye, Award, Zap, Hammer, Pencil, Eraser, Flag, Hexagon, User, Grid3x3, Settings, ChevronRight, AlertTriangle, Map, Download, Upload, Copy, FileJson, Clipboard } from 'lucide-react';
+import { Play, RotateCcw, Box, HelpCircle, CheckCircle, XCircle, Terminal, Trash2, Eye, Award, Zap, Hammer, Pencil, Eraser, Flag, Hexagon, User, Grid3x3, Settings, ChevronRight, AlertTriangle, Map, Download, Upload, Copy, FileJson, Clipboard, Clock, Timer } from 'lucide-react';
 import GridMap from './components/GridMap';
 import CodeBlocks from './components/CodeBlocks';
 import LevelSelect from './components/LevelSelect';
@@ -19,6 +19,7 @@ const DEFAULT_CUSTOM_LEVEL: LevelConfig = {
   optimalBlocks: 99, // Ignore in creative
   availableBlocks: [BlockType.Move, BlockType.MoveBack, BlockType.TurnLeft, BlockType.TurnRight, BlockType.Repeat],
   solution: [],
+  timeLimit: 0, // Default to unlimited for new maps
 };
 
 const App: React.FC = () => {
@@ -69,6 +70,18 @@ const App: React.FC = () => {
   const [playbackSpeed, setPlaybackSpeed] = useState(500); 
   const [attemptCount, setAttemptCount] = useState(0);
 
+  // --- Runtime Settings (Timer, etc.) ---
+  // Manage runtime settings that can be overridden by user
+  const [runSettings, setRunSettings] = useState<{
+      timerEnabled: boolean;
+      timeLimit: number;
+  }>({ timerEnabled: false, timeLimit: 60 });
+  
+  const [showSettingsModal, setShowSettingsModal] = useState(false); // Modal for settings
+
+  // --- Timer State ---
+  const [timeLeft, setTimeLeft] = useState<number>(0);
+
   // --- Execution State ---
   const [executionQueue, setExecutionQueue] = useState<Block[]>([]);
   const [currentStepIndex, setCurrentStepIndex] = useState(-1);
@@ -92,19 +105,18 @@ const App: React.FC = () => {
       localStorage.setItem('gesture_coder_solutions', JSON.stringify(savedSolutions));
   }, [savedSolutions]);
 
+  // --- Initialization & Mode Switching ---
+  
   // Initialize level when ID changes or Mode changes
-  // This effect handles "Loading" the level state (clearing or loading saved code)
   useEffect(() => {
     // 1. Determine initial program
     let initialProgram: Block[] = [];
     
     if (gameMode === GameMode.Story) {
-        // If we have a saved solution for this level, load it
         if (savedSolutions[currentLevelId]) {
             initialProgram = savedSolutions[currentLevelId];
         }
     }
-    
     setProgram(initialProgram);
 
     // 2. Reset Runtime State
@@ -116,27 +128,38 @@ const App: React.FC = () => {
     setShowClearModal(false);
     setAttemptCount(0);
     
+    // 3. Sync Settings with Level Default
+    const defaultTimeLimit = activeLevel.timeLimit || 0;
+    const isTimerDefault = defaultTimeLimit > 0;
+    
+    setRunSettings({
+        timerEnabled: isTimerDefault,
+        timeLimit: isTimerDefault ? defaultTimeLimit : 60
+    });
+    
+    // 4. Reset Timer
+    setTimeLeft(isTimerDefault ? defaultTimeLimit : 0);
+
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentLevelId, gameMode]); // Intentionally omitting savedSolutions to prevent reset on save
+  }, [currentLevelId, gameMode]);
 
   // Special reset for entering Creative Mode & Auto-Adaptation
   useEffect(() => {
      if (gameMode === GameMode.Creative) {
-         setViewState('game'); // Creative always shows game view
-         // Auto-adapt grid size based on screen width
+         setViewState('game');
          const isMobile = window.innerWidth < 768;
          const defaultSize = isMobile ? 5 : 8;
 
          const newLevel = {
              ...DEFAULT_CUSTOM_LEVEL,
-             gridSize: defaultSize
+             gridSize: defaultSize,
+             timeLimit: 0 // Default unlimited
          };
          
          setCustomLevel(newLevel);
          setIsEditingCustom(true);
          setRobotState(getInitialState(newLevel));
      } else {
-         // Switch to story, show map by default if switching modes
          setViewState('map');
      }
   }, [gameMode]);
@@ -145,6 +168,70 @@ const App: React.FC = () => {
   useEffect(() => {
       logsEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [robotState.logs]);
+
+  // --- Timer Logic ---
+  useEffect(() => {
+    // Timer runs if:
+    // 1. Enabled in settings
+    // 2. We are in Game View (not selecting levels)
+    // 3. We are NOT editing in creative mode (edit mode doesn't count down)
+    // 4. Game is not over (won/crashed/timedOut)
+    const timerActive = 
+        runSettings.timerEnabled && 
+        viewState === 'game' && 
+        (!isEditingCustom) &&
+        !robotState.won && 
+        !robotState.crashed &&
+        !robotState.timedOut;
+
+    let timer: number;
+    if (timerActive && timeLeft > 0) {
+        timer = window.setInterval(() => {
+            setTimeLeft((prev) => {
+                if (prev <= 1) {
+                    // Time's up!
+                    window.clearInterval(timer);
+                    handleTimeOut();
+                    return 0;
+                }
+                return prev - 1;
+            });
+        }, 1000);
+    }
+    
+    return () => clearInterval(timer);
+  }, [timeLeft, viewState, isEditingCustom, gameMode, robotState.won, robotState.crashed, robotState.timedOut, runSettings.timerEnabled]);
+
+  const handleTimeOut = () => {
+      setIsPlaying(false);
+      setRobotState(prev => ({
+          ...prev,
+          crashed: true, // Use crashed flag to trigger game over logic
+          timedOut: true,
+          logs: [...prev.logs, "严重错误：任务超时！"]
+      }));
+  };
+
+  const formatTime = (seconds: number) => {
+      const m = Math.floor(seconds / 60);
+      const s = seconds % 60;
+      return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+  };
+
+  const updateRunSettings = (enabled: boolean, time: number) => {
+      setRunSettings({ timerEnabled: enabled, timeLimit: time });
+      // If we are not playing, update the displayed timeLeft immediately to reflect new setting
+      if (!isPlaying && !robotState.won && !robotState.crashed) {
+          setTimeLeft(enabled ? time : 0);
+      }
+      // If in creative mode and editing, also update the level definition so it saves
+      if (gameMode === GameMode.Creative && isEditingCustom) {
+          setCustomLevel(prev => ({
+              ...prev,
+              timeLimit: enabled ? time : 0
+          }));
+      }
+  };
 
   // --- Level Selection Logic ---
   const handleSelectLevel = (id: number) => {
@@ -164,7 +251,6 @@ const App: React.FC = () => {
       const newEntities = [...customLevel.entities];
       const existingEntityIndex = newEntities.findIndex(e => e.x === x && e.y === y);
       
-      // Prevent placing start on top of existing entity (unless erasing)
       if (editorTool === EditorTool.Start) {
           if (existingEntityIndex !== -1) {
               newEntities.splice(existingEntityIndex, 1);
@@ -174,22 +260,17 @@ const App: React.FC = () => {
           return;
       }
 
-      // Handle Entities (Wall, End, Coin)
       if (editorTool === EditorTool.Erase) {
           if (existingEntityIndex !== -1) {
               newEntities.splice(existingEntityIndex, 1);
           }
       } else {
-          // Remove existing first if placing something new
           if (existingEntityIndex !== -1) {
               newEntities.splice(existingEntityIndex, 1);
           }
-
-          // Do not place entities on Start Pos
           if (x === customLevel.startPos.x && y === customLevel.startPos.y) {
               return; 
           }
-
           if (editorTool === EditorTool.Wall) {
               newEntities.push({ id: `w-${Date.now()}`, type: 'wall', x, y });
           } else if (editorTool === EditorTool.End) {
@@ -207,32 +288,30 @@ const App: React.FC = () => {
   const handleGridResize = (e: React.ChangeEvent<HTMLInputElement>) => {
       const newSize = parseInt(e.target.value, 10);
       setCustomLevel(prev => {
-          // 1. Filter out entities that are now out of bounds
           const validEntities = prev.entities.filter(ent => ent.x < newSize && ent.y < newSize);
-          
-          // 2. Check if Start Pos is out of bounds
           let newStartPos = prev.startPos;
           if (newStartPos.x >= newSize || newStartPos.y >= newSize) {
               newStartPos = { x: 0, y: 0 };
           }
-
           const updatedLevel = {
               ...prev,
               gridSize: newSize,
               entities: validEntities,
               startPos: newStartPos
           };
-
-          // Update visual robot immediately
           setRobotState(getInitialState(updatedLevel));
-
           return updatedLevel;
       });
   };
-  
+
   // --- Import / Export Handlers ---
   const openExportModal = () => {
-      const data = JSON.stringify(customLevel, null, 2);
+      // Ensure customLevel reflects current run settings before export
+      const levelToExport = {
+          ...customLevel,
+          timeLimit: runSettings.timerEnabled ? runSettings.timeLimit : 0
+      };
+      const data = JSON.stringify(levelToExport, null, 2);
       setShareData(data);
       setShareMode('export');
       setShowShareModal(true);
@@ -263,7 +342,6 @@ const App: React.FC = () => {
           reader.onload = (event) => {
               if (event.target?.result) {
                   setShareData(event.target.result as string);
-                  // Reset input value so the same file can be selected again if needed
                   if (fileInputRef.current) fileInputRef.current.value = '';
               }
           };
@@ -274,24 +352,30 @@ const App: React.FC = () => {
   const handleImportLevel = () => {
       try {
           const parsed = JSON.parse(shareData);
-          // Basic validation
           if (!parsed.gridSize || !Array.isArray(parsed.entities) || !parsed.startPos) {
               throw new Error("Missing required level fields");
           }
           
-          // Sanitize fields to be safe
           const importedLevel: LevelConfig = {
               ...DEFAULT_CUSTOM_LEVEL,
               ...parsed,
-              id: 999, // Force ID to creative
-              // Ensure we don't import extremely large grids that break UI
-              gridSize: Math.min(Math.max(3, parsed.gridSize), 12)
+              id: 999,
+              gridSize: Math.min(Math.max(3, parsed.gridSize), 12),
+              timeLimit: typeof parsed.timeLimit === 'number' ? parsed.timeLimit : 0
           };
 
           setCustomLevel(importedLevel);
           setRobotState(getInitialState(importedLevel));
+          
+          // Sync settings
+          const importedTime = importedLevel.timeLimit || 0;
+          setRunSettings({
+              timerEnabled: importedTime > 0,
+              timeLimit: importedTime > 0 ? importedTime : 60
+          });
+          setTimeLeft(importedTime > 0 ? importedTime : 0);
+
           setShowShareModal(false);
-          // Add a log to indicate success
           setRobotState(prev => ({
               ...prev,
               logs: [...prev.logs, ">> 外部地图数据导入成功"]
@@ -303,7 +387,6 @@ const App: React.FC = () => {
 
   const copyToClipboard = () => {
       navigator.clipboard.writeText(shareData).then(() => {
-          // Could add toast here, but for now simple alert or just UI feedback
           const btn = document.getElementById('copy-btn');
           if (btn) btn.innerText = "已复制!";
           setTimeout(() => {
@@ -319,13 +402,14 @@ const App: React.FC = () => {
           return;
       }
       setIsEditingCustom(false);
-      // Reset logic for Custom Level transition
       setRobotState(getInitialState(customLevel));
       setIsPlaying(false);
       setCurrentStepIndex(-1);
       setExecutionQueue([]);
       setShowWinModal(false);
       setAttemptCount(0);
+      // Timer is already synced via state
+      setTimeLeft(runSettings.timerEnabled ? runSettings.timeLimit : 0);
   };
 
   const backToEdit = () => {
@@ -350,7 +434,9 @@ const App: React.FC = () => {
     setIsPlaying(false);
     setRobotState(getInitialState(activeLevel));
     setCurrentStepIndex(-1);
-    setExecutionQueue([]); // Clear execution queue
+    setExecutionQueue([]); 
+    // Reset timer
+    setTimeLeft(runSettings.timerEnabled ? runSettings.timeLimit : 0);
   };
 
   const handleClearRequest = () => {
@@ -394,20 +480,20 @@ const App: React.FC = () => {
       const currentCommand = executionQueue[currentStepIndex];
       timer = window.setTimeout(() => {
         setRobotState(prev => {
+           if (prev.crashed || prev.timedOut) return prev;
+
            const newState = executeStep(prev, currentCommand, activeLevel);
            if (newState.crashed) setIsPlaying(false);
            if (newState.won) {
              setIsPlaying(false);
              // Logic when winning
              if (gameMode === GameMode.Story) {
-                 // 1. Mark level as completed
                  setCompletedLevels(prev => {
                      if (!prev.includes(activeLevel.id)) {
                          return [...prev, activeLevel.id];
                      }
                      return prev;
                  });
-                 // 2. Save the winning code (Solution)
                  setSavedSolutions(prev => ({
                      ...prev,
                      [activeLevel.id]: program
@@ -438,7 +524,6 @@ const App: React.FC = () => {
               </div>
           </div>
           
-          {/* Share / Import / Export */}
           <div className="grid grid-cols-2 gap-2 mb-4">
               <button 
                 onClick={openExportModal}
@@ -454,7 +539,6 @@ const App: React.FC = () => {
               </button>
           </div>
 
-          {/* Grid Size Slider */}
           <div className="bg-slate-900/50 p-3 rounded-lg border border-slate-700/50 mb-2">
               <div className="flex justify-between items-center mb-2">
                   <span className="text-xs text-slate-400 flex items-center gap-1">
@@ -473,6 +557,36 @@ const App: React.FC = () => {
                   onChange={handleGridResize}
                   className="w-full h-1.5 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-cyan-500 hover:accent-cyan-400"
               />
+          </div>
+
+          <div className="bg-slate-900/50 p-3 rounded-lg border border-slate-700/50 mb-2">
+              <div className="flex justify-between items-center mb-2">
+                  <span className="text-xs text-slate-400 flex items-center gap-1">
+                      <Timer size={12} /> 限时挑战
+                  </span>
+                  <div className="flex items-center">
+                    <input 
+                        type="checkbox"
+                        checked={runSettings.timerEnabled}
+                        onChange={(e) => updateRunSettings(e.target.checked, runSettings.timeLimit)}
+                        className="mr-2 accent-cyan-500 w-4 h-4 cursor-pointer"
+                    />
+                  </div>
+              </div>
+              
+              {runSettings.timerEnabled && (
+                  <div className="flex items-center gap-2 animate-fade-in">
+                      <input 
+                          type="number"
+                          min="10"
+                          max="300"
+                          value={runSettings.timeLimit}
+                          onChange={(e) => updateRunSettings(true, parseInt(e.target.value) || 60)}
+                          className="w-full bg-black/50 border border-slate-700 rounded px-2 py-1 text-xs text-cyan-400 font-mono focus:outline-none focus:border-cyan-500"
+                      />
+                      <span className="text-xs text-slate-500 whitespace-nowrap">秒</span>
+                  </div>
+              )}
           </div>
 
           <div className="text-sm font-bold text-slate-400 uppercase tracking-widest mb-2 border-b border-slate-700 pb-2 mt-4">
@@ -615,7 +729,7 @@ const App: React.FC = () => {
                 ) : (
                     <>
                         {/* Control Bar */}
-                        <div className="bg-slate-800 p-3 rounded-xl border border-slate-700 flex gap-2 shrink-0">
+                        <div className="bg-slate-800 p-3 rounded-xl border border-slate-700 flex gap-2 shrink-0 relative">
                             {gameMode === GameMode.Creative && (
                                 <button 
                                     onClick={backToEdit}
@@ -648,6 +762,17 @@ const App: React.FC = () => {
                                 title="重置模拟"
                             >
                                 <RotateCcw size={18} />
+                            </button>
+
+                            {/* Settings Button (Timer) - Opens Modal */}
+                            <button
+                                onClick={() => setShowSettingsModal(true)}
+                                className={`px-3 py-3 rounded-lg transition-colors flex items-center justify-center border border-transparent
+                                    ${runSettings.timerEnabled ? 'text-cyan-400 bg-slate-800 border-cyan-500/30' : 'bg-slate-700 text-slate-400 hover:text-white'}
+                                `}
+                                title="挑战设置"
+                            >
+                                <Settings size={18} />
                             </button>
 
                             <button 
@@ -684,21 +809,41 @@ const App: React.FC = () => {
             </section>
 
             {/* Right Panel: Simulation / Grid Map */}
-            <section className="order-1 md:order-2 flex-1 relative bg-slate-950 flex flex-col overflow-hidden">
+            <section className="order-1 md:order-2 flex-1 relative bg-slate-950 flex flex-col overflow-hidden" onClick={() => setShowSettingsModal(false)}>
                 
-                {/* Top Error Banner */}
-                <div className="absolute top-4 left-0 right-0 px-6 z-30 pointer-events-none flex justify-center">
-                    {robotState.crashed && (
-                        <div className="bg-red-900/90 backdrop-blur border border-red-500 text-red-100 px-4 py-2 rounded-lg flex items-center justify-center gap-3 shadow-[0_0_20px_rgba(239,68,68,0.4)] animate-fade-in pointer-events-auto">
-                            <XCircle size={20} className="text-red-400" />
-                            <span className="text-sm font-bold">发生碰撞！系统停止。</span>
-                            <button onClick={handleStop} className="ml-2 text-xs bg-red-800 hover:bg-red-700 px-2 py-1 rounded border border-red-700">重置</button>
-                        </div>
-                    )}
-                    {gameMode === GameMode.Creative && isEditingCustom && (
-                        <div className="bg-purple-900/80 backdrop-blur border border-purple-500 text-purple-100 px-4 py-2 rounded-lg flex items-center justify-center gap-2 shadow-xl animate-fade-in">
-                            <Pencil size={16} />
-                            <span className="text-xs font-bold">编辑模式：点击网格放置元素</span>
+                {/* Top Overlay Banner (Crash/Info/Timer) */}
+                <div className="absolute top-4 left-0 right-0 px-6 z-30 pointer-events-none flex justify-between items-start">
+                    {/* Left side empty for now, or could show level name overlay */}
+                    <div className="flex-1 flex justify-center">
+                        {robotState.crashed && (
+                            <div className="bg-red-900/90 backdrop-blur border border-red-500 text-red-100 px-4 py-2 rounded-lg flex items-center justify-center gap-3 shadow-[0_0_20px_rgba(239,68,68,0.4)] animate-fade-in pointer-events-auto">
+                                <XCircle size={20} className="text-red-400" />
+                                <span className="text-sm font-bold">
+                                    {robotState.timedOut ? "时间耗尽！任务失败。" : "发生碰撞！系统停止。"}
+                                </span>
+                                <button onClick={handleStop} className="ml-2 text-xs bg-red-800 hover:bg-red-700 px-2 py-1 rounded border border-red-700">重置</button>
+                            </div>
+                        )}
+                        {gameMode === GameMode.Creative && isEditingCustom && (
+                            <div className="bg-purple-900/80 backdrop-blur border border-purple-500 text-purple-100 px-4 py-2 rounded-lg flex items-center justify-center gap-2 shadow-xl animate-fade-in">
+                                <Pencil size={16} />
+                                <span className="text-xs font-bold">编辑模式：点击网格放置元素</span>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Timer HUD (Right Side) */}
+                    {runSettings.timerEnabled && !isEditingCustom && (
+                        <div className={`
+                            absolute right-4 top-0 pointer-events-auto
+                            px-3 py-1.5 rounded-lg border backdrop-blur-md shadow-lg flex items-center gap-2
+                            transition-all duration-500
+                            ${timeLeft <= 10 
+                                ? 'bg-red-900/80 border-red-500 text-red-400 animate-pulse' 
+                                : 'bg-slate-900/80 border-cyan-500/50 text-cyan-400'}
+                        `}>
+                            <Clock size={16} />
+                            <span className="font-mono text-lg font-bold">{formatTime(timeLeft)}</span>
                         </div>
                     )}
                 </div>
@@ -752,6 +897,70 @@ const App: React.FC = () => {
 
             </section>
         </main>
+      )}
+
+      {/* Settings Modal (Fixed Position to avoid Z-Index issues) */}
+      {showSettingsModal && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/60 backdrop-blur-[2px] p-4 animate-fade-in" onClick={() => setShowSettingsModal(false)}>
+            <div 
+                className="bg-slate-900 border border-slate-600 rounded-xl p-5 w-full max-w-xs shadow-2xl relative overflow-hidden" 
+                onClick={e => e.stopPropagation()}
+            >
+                 <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-500 to-cyan-400" />
+                 
+                 <div className="flex justify-between items-center mb-4">
+                    <div className="flex items-center gap-2 text-cyan-400 font-bold">
+                        <Settings size={18} />
+                        <span>挑战设置</span>
+                    </div>
+                    <button onClick={() => setShowSettingsModal(false)} className="text-slate-500 hover:text-white transition-colors">
+                        <XCircle size={20} />
+                    </button>
+                 </div>
+
+                 <div className="space-y-4">
+                     <div className="flex justify-between items-center bg-slate-800/50 p-3 rounded-lg border border-slate-700/30">
+                        <div className="flex items-center gap-2">
+                            <Timer size={16} className="text-slate-400" />
+                            <span className="text-sm text-slate-200">启用限时挑战</span>
+                        </div>
+                        {/* Custom Toggle Switch */}
+                        <button 
+                            onClick={() => updateRunSettings(!runSettings.timerEnabled, runSettings.timeLimit)}
+                            className={`w-10 h-5 rounded-full relative transition-colors duration-300 ${runSettings.timerEnabled ? 'bg-cyan-500' : 'bg-slate-700'}`}
+                        >
+                            <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full transition-all duration-300 shadow-sm ${runSettings.timerEnabled ? 'left-[calc(100%-1.125rem)]' : 'left-0.5'}`} />
+                        </button>
+                     </div>
+
+                     {runSettings.timerEnabled && (
+                         <div className="animate-fade-in bg-slate-800/50 p-3 rounded-lg border border-slate-700/30">
+                            <div className="flex justify-between text-xs text-slate-400 mb-2">
+                                <span>目标时间</span>
+                                <span className="text-cyan-400 font-mono font-bold">{runSettings.timeLimit} 秒</span>
+                            </div>
+                            <input 
+                                type="range" 
+                                min="10" 
+                                max="300" 
+                                step="5"
+                                value={runSettings.timeLimit}
+                                onChange={(e) => updateRunSettings(true, parseInt(e.target.value))}
+                                className="w-full h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-cyan-500 hover:accent-cyan-400"
+                            />
+                            <div className="flex justify-between text-[10px] text-slate-600 mt-1 font-mono">
+                                <span>10s</span>
+                                <span>300s</span>
+                            </div>
+                         </div>
+                     )}
+                     
+                     <div className="text-[10px] text-slate-500 italic text-center pt-2 border-t border-slate-800">
+                        {gameMode === GameMode.Story ? "修改将仅影响当前挑战" : "设置将保存至地图配置"}
+                     </div>
+                 </div>
+            </div>
+        </div>
       )}
       
       {/* Share / Import / Export Modal */}
