@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Play, RotateCcw, Box, HelpCircle, CheckCircle, XCircle, Terminal, Trash2, Eye, Award, Zap, Hammer, Pencil, Eraser, Flag, Hexagon, User, Grid3x3, Settings, ChevronRight, AlertTriangle, Map, Download, Upload, Copy, FileJson, Clipboard, Clock, Timer } from 'lucide-react';
+import { Play, RotateCcw, Box, HelpCircle, CheckCircle, XCircle, Terminal, Trash2, Eye, Award, Zap, Hammer, Pencil, Eraser, Flag, Hexagon, User, Grid3x3, Settings, ChevronRight, AlertTriangle, Map, Download, Upload, Copy, FileJson, Clipboard, Clock, Timer, X } from 'lucide-react';
 import GridMap from './components/GridMap';
 import CodeBlocks from './components/CodeBlocks';
 import LevelSelect from './components/LevelSelect';
@@ -168,6 +168,97 @@ const App: React.FC = () => {
   useEffect(() => {
       logsEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [robotState.logs]);
+
+  // --- Audio Helper for Timer ---
+  const audioCtxRef = useRef<AudioContext | null>(null);
+
+  // Global Audio Initialization
+  useEffect(() => {
+      const initGlobalAudio = () => {
+          try {
+              if (!audioCtxRef.current) {
+                  const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
+                  if (AudioContext) {
+                      audioCtxRef.current = new AudioContext();
+                  }
+              }
+              if (audioCtxRef.current && audioCtxRef.current.state === 'suspended') {
+                  audioCtxRef.current.resume();
+              }
+          } catch (e) {
+              console.error("Global audio init failed", e);
+          }
+      };
+
+      window.addEventListener('click', initGlobalAudio, { once: true });
+      window.addEventListener('touchstart', initGlobalAudio, { once: true });
+      window.addEventListener('keydown', initGlobalAudio, { once: true });
+
+      return () => {
+          window.removeEventListener('click', initGlobalAudio);
+          window.removeEventListener('touchstart', initGlobalAudio);
+          window.removeEventListener('keydown', initGlobalAudio);
+      };
+  }, []);
+
+  const playTickSound = useCallback((isUrgent: boolean) => {
+      try {
+          if (!audioCtxRef.current) {
+              const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
+              if (!AudioContext) return;
+              audioCtxRef.current = new AudioContext();
+          }
+          
+          const ctx = audioCtxRef.current;
+          if (ctx.state === 'suspended') {
+              ctx.resume();
+          }
+
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          
+          osc.type = 'sine';
+          // Higher pitch (880Hz) for last 3 seconds, normal (523Hz - C5) otherwise
+          osc.frequency.setValueAtTime(isUrgent ? 880 : 523.25, ctx.currentTime); 
+          
+          gain.gain.setValueAtTime(0.1, ctx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.1); // Short blip
+          
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          
+          osc.start();
+          osc.stop(ctx.currentTime + 0.1);
+      } catch (e) {
+          // Ignore audio errors (e.g. user hasn't interacted yet)
+          console.error("Audio play failed", e);
+      }
+  }, []);
+
+  // --- Timer Sound Logic ---
+  useEffect(() => {
+     if (!runSettings.timerEnabled || robotState.won || robotState.crashed || robotState.timedOut) {
+         return;
+     }
+
+     const totalDuration = runSettings.timeLimit;
+     let soundThreshold = 0;
+
+     // Threshold Logic:
+     // If total > 10s: Start beeping at 10s.
+     // If 6s < total <= 10s: Start beeping at 6s.
+     // If total <= 6s: Start beeping at 6s (effectively from start).
+     if (totalDuration > 10) {
+         soundThreshold = 10;
+     } else {
+         soundThreshold = 6;
+     }
+
+     if (timeLeft <= soundThreshold && timeLeft > 0) {
+         const isUrgent = timeLeft <= 3;
+         playTickSound(isUrgent);
+     }
+  }, [timeLeft, runSettings.timerEnabled, robotState.won, robotState.crashed, robotState.timedOut, runSettings.timeLimit, playTickSound]);
 
   // --- Timer Logic ---
   useEffect(() => {
@@ -422,6 +513,22 @@ const App: React.FC = () => {
   // --- Gameplay Logic ---
   const handleRun = () => {
     if (program.length === 0) return;
+
+    // Initialize audio context on user interaction
+    try {
+        if (!audioCtxRef.current) {
+            const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
+            if (AudioContext) {
+                audioCtxRef.current = new AudioContext();
+            }
+        }
+        if (audioCtxRef.current && audioCtxRef.current.state === 'suspended') {
+            audioCtxRef.current.resume();
+        }
+    } catch (e) {
+        console.error("Audio init failed", e);
+    }
+
     setAttemptCount(prev => prev + 1);
     const flatSteps = compileProgram(program);
     setExecutionQueue(flatSteps);
@@ -1081,8 +1188,16 @@ const App: React.FC = () => {
            `}>
               <div className={`absolute top-0 left-0 w-full h-1 bg-gradient-to-r ${isOptimal ? 'from-transparent via-green-500 to-transparent' : 'from-transparent via-yellow-500 to-transparent'}`} />
               
+              {/* Close Button */}
+              <button 
+                  onClick={() => setShowWinModal(false)}
+                  className="absolute top-3 right-3 text-slate-500 hover:text-white transition-colors z-20"
+              >
+                  <X size={24} />
+              </button>
+
               {isOneShot && (
-                  <div className="absolute top-4 right-4 bg-yellow-500/20 text-yellow-300 border border-yellow-500/50 text-[10px] font-bold px-2 py-1 rounded-full flex items-center gap-1 animate-pulse">
+                  <div className="absolute top-4 left-4 bg-yellow-500/20 text-yellow-300 border border-yellow-500/50 text-[10px] font-bold px-2 py-1 rounded-full flex items-center gap-1 animate-pulse">
                       <Zap size={10} fill="currentColor" />
                       一次通关
                   </div>
