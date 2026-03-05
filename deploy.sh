@@ -7,7 +7,8 @@ git add .
 git commit -m "update" || echo "No changes to commit"
 git push -u origin main
 
-#m -rf node_modules package-lock.json
+npm cache clean --force
+rm -rf node_modules package-lock.json
 npm install --legacy-peer-deps
 npm run build
 
