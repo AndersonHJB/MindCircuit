@@ -1,20 +1,15 @@
 #! /usr/bin/env sh
-set -e
-
 git pull
 git status
 git add .
-git commit -m "update" || echo "No changes to commit"
+git commit -m "update"
 git push -u origin main
-
-npm cache clean --force
-rm -rf node_modules package-lock.json
-npm install --legacy-peer-deps --registry=https://registry.npmjs.org/
+npm install
 npm run build
 
+set -e
 cd dist
 echo "已成功进入目录打包...正在进行打包"
-mkdir -p ../zip
 zip -r ../zip/dist.zip ./
 echo "已经成功打包"
 
