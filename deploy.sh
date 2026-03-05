@@ -9,7 +9,7 @@ git push -u origin main
 
 npm cache clean --force
 rm -rf node_modules package-lock.json
-npm install --legacy-peer-deps
+npm install --legacy-peer-deps --registry=https://registry.npmjs.org/
 npm run build
 
 cd dist
