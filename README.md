@@ -1,20 +1,38 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
+# 🧠 MindCircuit (思维回路)
 
-# Run and deploy your AI Studio app
+欢迎来到 **MindCircuit** —— 一个充满无限可能的逻辑与解谜世界！
 
-This contains everything you need to run your app locally.
+在这里，我们不谈论枯燥的说明书。我们只关心一件事：**你的想象力与逻辑思维能碰撞出怎样的火花？**
 
-View your app in AI Studio: https://ai.studio/apps/92df2c27-54a5-4073-9355-68e93af207ea
+## 🌟 这是什么？
 
-## Run Locally
+MindCircuit 是一款让你沉浸其中的互动式益智闯关游戏。在这个充满未知与挑战的网格世界里，你将化身为一位“思维导师”。你需要通过巧妙地组合不同的指令指令，规划出最完美的行动路线，解开一个又一个精心设计的迷局。
 
-**Prerequisites:**  Node.js
+这不仅仅是对智力的考验，更是一场充满趣味的思维体操！
 
+## ✨ 核心体验
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+* **🧩 像玩积木一样拼凑灵感**
+  告别复杂的规则！你可以通过直观的模块，轻松地将脑海中的想法具象化。拼接、组合、运行，只要你的逻辑行得通，奇迹就会在这个小小的网格世界中发生。
+
+* **👋 挥挥手，施展你的“魔法”**
+  谁说玩游戏只能僵硬地按动鼠标？我们为你准备了奇妙的**隔空互动体验**！你可以通过简单的手势动作，直接与游戏内的元素产生连接。隔空指挥，仿佛你真的拥有了控制这个微缩世界的魔法。
+
+* **🗺️ 层层递进的奇妙探险**
+  从轻松愉快的新手热身，到后期需要绞尽脑汁的复杂迷宫，海量关卡等你来挑战。每一次卡关后的灵光一闪，和每一次成功通关的喜悦，都是一次智力的自我超越。
+
+## 🎮 谁会爱上这款游戏？
+
+* 🧩 喜欢解谜、享受“顿悟”瞬间的硬核脑力爱好者。
+
+* 🌱 想要在轻松愉快的氛围中锻炼逻辑思维能力的大小朋友。
+
+* 💆‍♀️ 寻找一款能在闲暇时间放松身心、同时又能让大脑保持活力的玩家。
+
+## 🚀 开启你的旅程
+
+准备好接受挑战了吗？
+
+清空你的杂念，活动你的大脑（还有你的双手），让我们在 **MindCircuit** 的世界里，一起点亮所有的思维节点，寻找最终的答案吧！
+
+*“逻辑能带你从A点走到B点，而想象力能带你到达任何地方。”*
